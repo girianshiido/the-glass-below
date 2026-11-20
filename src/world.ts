@@ -18,7 +18,7 @@ export const MAP = [
 export const WIDTH = MAP[0].length;
 export const HEIGHT = MAP.length;
 export const DIRECTIONS = [[1,0],[0,1],[-1,0],[0,-1]] as const;
-export const CARDINALS = ['Est','Sud','Ouest','Nord'];
+export const CARDINALS = ['E','S','W','N'];
 export interface Point { x:number; y:number }
 export type CreatureKind = 'scavenger'|'wraith'|'sentinel';
 export interface EncounterDef extends Point { id:string; kind:CreatureKind; count:number }

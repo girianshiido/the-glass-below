@@ -15,7 +15,7 @@ export function deserialize(raw:string):Game|null{
     if(!Array.isArray(s.seen)||s.seen.length>WIDTH*HEIGHT||s.seen.some((v:unknown)=>typeof v!=='string'||!/^\d+,\d+$/.test(v)||v.split(',').some((n,i)=>+n>=(i===0?WIDTH:HEIGHT))))return null;
     if(!Number.isFinite(s.gold)||s.gold<0||!Number.isFinite(s.playTime)||s.playTime<0)return null;
     if(typeof s.complete!=='boolean'||s.complete&&!s.cleared.includes('guardian'))return null;
-    g.position={...s.position};g.direction=s.direction;g.cleared=new Set(s.cleared);g.seen=new Set(s.seen);g.gold=s.gold;g.playTime=s.playTime;g.phase=s.complete?'complete':'explore';g.message='Votre expédition reprend.';return g;
+    g.position={...s.position};g.direction=s.direction;g.cleared=new Set(s.cleared);g.seen=new Set(s.seen);g.gold=s.gold;g.playTime=s.playTime;g.phase=s.complete?'complete':'explore';g.message='';return g;
   }catch{return null;}
 }
 export function save(g:Game){try{localStorage.setItem(KEY,serialize(g));return true;}catch{return false;}}

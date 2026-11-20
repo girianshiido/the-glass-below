@@ -47,7 +47,7 @@ export class DungeonRenderer {
   public error='';
   constructor(public canvas:HTMLCanvasElement){
     const gl=canvas.getContext('webgl',{alpha:false,antialias:true,powerPreference:'low-power'});
-    if(!gl)throw new Error('Le rendu 3D nécessite WebGL. Activez l’accélération graphique de votre navigateur.');this.gl=gl;
+    if(!gl)throw new Error('WebGL is required. Enable hardware acceleration in your browser.');this.gl=gl;
     const shader=(type:number,source:string)=>{const s=gl.createShader(type)!;gl.shaderSource(s,source);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(s)??'Shader');return s;};
     this.program=gl.createProgram()!;gl.attachShader(this.program,shader(gl.VERTEX_SHADER,VERTEX));gl.attachShader(this.program,shader(gl.FRAGMENT_SHADER,FRAGMENT));gl.linkProgram(this.program);if(!gl.getProgramParameter(this.program,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(this.program)??'WebGL');gl.useProgram(this.program);
     this.positions=gl.getAttribLocation(this.program,'aPosition');this.normals=gl.getAttribLocation(this.program,'aNormal');this.uvs=gl.getAttribLocation(this.program,'aUv');
@@ -70,7 +70,7 @@ export class DungeonRenderer {
     }
     this.walls=this.mesh(walls);this.floor=this.mesh(floor);this.ceiling=this.mesh(ceiling);this.dynamic=this.mesh([]);
     this.ready=this.loadAtlas().catch(error=>{this.error=String(error);throw error;});
-    canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();this.error='Le contexte graphique a été interrompu. Rechargez la page pour reprendre votre sauvegarde.';});
+    canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();this.error='The graphics context was lost. Reload to resume your saved expedition.';});
   }
   private async loadAtlas(){const img=new Image();img.src='./art/bestiary.png';await img.decode();this.atlas=this.texture(img);}
   private texture(image:TexImageSource){const gl=this.gl,t=gl.createTexture()!;gl.bindTexture(gl.TEXTURE_2D,t);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,1);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,image);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);return t;}

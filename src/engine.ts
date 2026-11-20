@@ -8,20 +8,20 @@ export interface Battle {encounter:string;enemies:Enemy[];target:number;time:num
 export interface Feedback {id:number;kind:'hit'|'hurt'|'heal'|'ice'|'break'|'guard';text:string;enemy?:number;hero?:number;time:number}
 export interface Game {phase:Phase;position:Point;direction:number;heroes:Hero[];battle:Battle|null;cleared:Set<string>;seen:Set<string>;key:boolean;gateOpen:boolean;chestOpen:boolean;shrineUsed:boolean;gold:number;message:string;feedback:Feedback[];eventId:number;playTime:number}
 export const CREATURES:Record<CreatureKind,{name:string;hp:number;attack:number;period:number;windup:number;skill:string;tip:string;row:number}>={
-  scavenger:{name:'Rôdeur de verre',hp:115,attack:12,period:3.6,windup:1.5,skill:'Morsure cristalline',tip:'Sa carapace cède sous Fracture.',row:0},
-  wraith:{name:'Veilleur des lanternes',hp:150,attack:22,period:4.8,windup:2.4,skill:'Lueur dévorante',tip:'Interrompez son incantation avec Éclat de givre.',row:1},
-  sentinel:{name:'Le Gardien sans visage',hp:580,attack:36,period:5.2,windup:2.8,skill:'Sentence du sanctuaire',tip:'Ses frappes lourdes menacent les deux aventuriers. Gardez le givre pour les interrompre.',row:2},
+  scavenger:{name:'Glass Scavenger',hp:115,attack:12,period:3.6,windup:1.5,skill:'Crystal Bite',tip:'Fracture breaks its crystalline shell.',row:0},
+  wraith:{name:'Lantern Watcher',hp:150,attack:22,period:4.8,windup:2.4,skill:'Devouring Light',tip:'Interrupt its spell with Frost Shard.',row:1},
+  sentinel:{name:'The Faceless Warden',hp:580,attack:36,period:5.2,windup:2.8,skill:'Warden’s Judgment',tip:'Its heavy strikes threaten the entire party. Save Frost Shard to interrupt them.',row:2},
 };
 export const SKILLS:Record<Skill,{name:string;cost:number;cooldown:number;hero:number;description:string}>={
-  fracture:{name:'Fracture',cost:5,cooldown:5,hero:0,description:'38 dégâts. Interrompt la préparation de la cible.'},
-  frost:{name:'Éclat de givre',cost:7,cooldown:7,hero:1,description:'30 dégâts. Interrompt et fige la cible pendant 2 secondes.'},
-  heal:{name:'Sceau de soin',cost:9,cooldown:10,hero:1,description:'Rend 58 PV à l’allié le plus blessé.'},
+  fracture:{name:'Fracture',cost:5,cooldown:5,hero:0,description:'Deals 38 damage and interrupts the target.'},
+  frost:{name:'Frost Shard',cost:7,cooldown:7,hero:1,description:'Deals 30 damage. Interrupts and freezes the target for 2 seconds.'},
+  heal:{name:'Mending Seal',cost:9,cooldown:10,hero:1,description:'Restores 58 HP to the most wounded ally.'},
 };
 export function createGame():Game{
   const g:Game={phase:'explore',position:{...START},direction:0,heroes:[
-    {name:'Kaël',hp:180,maxHp:180,mp:32,maxMp:32,clock:0,attack:12},
+    {name:'Kael',hp:180,maxHp:180,mp:32,maxMp:32,clock:0,attack:12},
     {name:'Lys',hp:140,maxHp:140,mp:44,maxMp:44,clock:.3,attack:9},
-  ],battle:null,cleared:new Set(),seen:new Set(),key:false,gateOpen:false,chestOpen:false,shrineUsed:false,gold:0,message:'Retrouvez la clé de cuivre et atteignez le sanctuaire.',feedback:[],eventId:0,playTime:0};
+  ],battle:null,cleared:new Set(),seen:new Set(),key:false,gateOpen:false,chestOpen:false,shrineUsed:false,gold:0,message:'',feedback:[],eventId:0,playTime:0};
   reveal(g.seen,g.position,false);return g;
 }
 function emit(g:Game,kind:Feedback['kind'],text:string,enemy?:number,hero?:number){g.feedback.push({id:++g.eventId,kind,text,enemy,hero,time:g.battle?.time??0});if(g.feedback.length>25)g.feedback.shift();}
@@ -39,27 +39,27 @@ export function move(g:Game,relative:number){
   if(g.phase!=='explore')return false;
   const direction=(g.direction+relative+4)%4,[dx,dy]=DIRECTIONS[direction];
   const next={x:g.position.x+dx,y:g.position.y+dy};
-  if(wall(next.x,next.y)){g.message='La pierre vous barre le passage.';return false;}
-  if(same(next,GATE)&&!g.gateOpen){g.message=g.key?'La grille est verrouillée. Utilisez Interagir pour employer la clé.':'La grille exige une clé de cuivre.';return false;}
+  if(wall(next.x,next.y)){g.message='The way is blocked.';return false;}
+  if(same(next,GATE)&&!g.gateOpen){g.message=g.key?'The gate is locked. Interact to use the key.':'A copper key is needed.';return false;}
   const encounter=ENCOUNTERS.find(e=>!g.cleared.has(e.id)&&same(e,next));
   if(encounter){g.direction=direction;beginBattle(g,encounter);return false;}
   g.position=next;reveal(g.seen,next,g.gateOpen);g.message=locationHint(g);
-  if(same(next,EXIT)&&g.cleared.has('guardian')){g.phase='complete';g.message='Le silence revient dans les Cryptes de Verre.';return true;}
+  if(same(next,EXIT)&&g.cleared.has('guardian')){g.phase='complete';g.message='Silence returns to the Glass Crypts.';return true;}
   const ahead=encounterAhead(g);if(ahead)beginBattle(g,ahead);
   return true;
 }
 export function turn(g:Game,delta:number){if(g.phase!=='explore')return;g.direction=(g.direction+delta+4)%4;reveal(g.seen,g.position,g.gateOpen);g.message=locationHint(g);const e=encounterAhead(g);if(e)beginBattle(g,e);}
 export function locationHint(g:Game){
-  if(same(g.position,CHEST)&&!g.chestOpen)return'Un coffre de cuivre. Utilisez Interagir pour l’ouvrir.';
-  if(same(g.position,SHRINE)&&!g.shrineUsed)return'Une source intacte. Interagissez pour restaurer votre groupe.';
-  if(!g.gateOpen&&Math.abs(g.position.x-GATE.x)+Math.abs(g.position.y-GATE.y)===1)return g.key?'La clé de cuivre ouvre cette grille.':'Une grille verrouillée protège le sanctuaire.';
-  return g.key?'Rejoignez la grille, à l’est des cryptes.':'Cherchez la clé de cuivre dans les cryptes.';
+  if(same(g.position,CHEST)&&!g.chestOpen)return'Interact to open the chest.';
+  if(same(g.position,SHRINE)&&!g.shrineUsed)return'Interact to restore your party at the spring.';
+  if(!g.gateOpen&&Math.abs(g.position.x-GATE.x)+Math.abs(g.position.y-GATE.y)===1)return g.key?'Interact to unlock the gate.':'The gate is locked.';
+  return'';
 }
 export function interact(g:Game){
   if(g.phase!=='explore')return;
-  if(same(g.position,CHEST)&&!g.chestOpen){g.chestOpen=true;g.key=true;g.gold+=30;g.message='Clé de cuivre obtenue · 30 éclats retrouvés.';return;}
-  if(same(g.position,SHRINE)&&!g.shrineUsed){g.shrineUsed=true;for(const h of g.heroes){h.hp=h.maxHp;h.mp=h.maxMp;}g.message='La source restaure tous vos PV et PM.';return;}
-  if(!g.gateOpen&&Math.abs(g.position.x-GATE.x)+Math.abs(g.position.y-GATE.y)===1){if(g.key){g.gateOpen=true;reveal(g.seen,g.position,true);g.message='La grille s’ouvre. Le Gardien vous attend.';}else g.message='Il vous manque la clé de cuivre.';return;}
+  if(same(g.position,CHEST)&&!g.chestOpen){g.chestOpen=true;g.key=true;g.gold+=30;g.message='Copper key found · +30 shards';return;}
+  if(same(g.position,SHRINE)&&!g.shrineUsed){g.shrineUsed=true;for(const h of g.heroes){h.hp=h.maxHp;h.mp=h.maxMp;}g.message='The spring restores all HP and MP.';return;}
+  if(!g.gateOpen&&Math.abs(g.position.x-GATE.x)+Math.abs(g.position.y-GATE.y)===1){if(g.key){g.gateOpen=true;reveal(g.seen,g.position,true);g.message='The gate opens.';}else g.message='You need the copper key.';return;}
   g.message=locationHint(g);
 }
 export function livingTarget(g:Game){const b=g.battle;if(!b)return undefined;return b.enemies.find(e=>e.id===b.target&&e.hp>0)??b.enemies.find(e=>e.hp>0);}
@@ -78,7 +78,7 @@ function execute(g:Game,skill:Skill){
     const interrupted=enemy.windup>0;enemy.windup=0;enemy.clock=0;
     if(skill==='frost'){enemy.stunned=2;damage(g,enemy,30,'ice');}
     else{enemy.stunned=Math.max(enemy.stunned,.6);damage(g,enemy,38,'break');}
-    g.message=interrupted?'Préparation interrompue !':`${d.name} atteint sa cible.`;
+    g.message=interrupted?'Attack interrupted!':`${d.name} hits its target.`;
   }
   resolve(g);return true;
 }
@@ -88,19 +88,19 @@ export function useSkill(g:Game,skill:Skill){
     if(b.queue.includes(skill)){b.queue=b.queue.filter(s=>s!==skill);return true;}
     if(!canUse(g,skill,false))return false;
     const owner=SKILLS[skill].hero;
-    b.queue=b.queue.filter(s=>SKILLS[s].hero!==owner);b.queue.push(skill);g.message='Ordre préparé. Il sera exécuté à la reprise.';return true;
+    b.queue=b.queue.filter(s=>SKILLS[s].hero!==owner);b.queue.push(skill);g.message='Action queued.';return true;
   }
   return execute(g,skill);
 }
-export function togglePause(g:Game){if(g.phase==='combat'&&g.battle){g.battle.paused=!g.battle.paused;g.message=g.battle.paused?'Temps suspendu. Choisissez une cible et préparez vos compétences.':'Le combat reprend.';}}
+export function togglePause(g:Game){if(g.phase==='combat'&&g.battle){g.battle.paused=!g.battle.paused;g.message='';}}
 function resolve(g:Game){
   const b=g.battle!;
   if(b.enemies.every(e=>e.hp<=0)){
     g.cleared.add(b.encounter);g.phase='victory';b.paused=false;b.queue=[];
     const boss=b.encounter==='guardian';g.gold+=boss?100:20;
     for(const h of g.heroes){h.hp=Math.min(h.maxHp,Math.max(h.hp,1)+18);h.mp=Math.min(h.maxMp,h.mp+10);}
-    g.message=boss?'Le Gardien est tombé. La sortie vous attend au bout du passage.':'Passage libéré. +18 PV et +10 PM pour chaque aventurier.';
-  }else if(g.heroes.every(h=>h.hp<=0)){g.phase='defeat';b.paused=false;b.queue=[];g.message='Votre expédition s’achève ici. Reprenez depuis l’entrée des cryptes.';}
+    g.message=boss?'The Warden has fallen. The exit lies ahead.':'Passage cleared · +18 HP and +10 MP each';
+  }else if(g.heroes.every(h=>h.hp<=0)){g.phase='defeat';b.paused=false;b.queue=[];g.message='Your expedition ends here. Return to the last saved checkpoint.';}
   else b.target=livingTarget(g)!.id;
 }
 export function tick(g:Game,dt:number){
@@ -136,4 +136,4 @@ export function tick(g:Game,dt:number){
   }
 }
 export function continueAfterBattle(g:Game){if(g.phase!=='victory')return;g.phase='explore';g.battle=null;g.feedback=[];g.message=locationHint(g);}
-export function retreat(g:Game){if(g.phase!=='combat')return;g.phase='explore';g.battle=null;g.feedback=[];g.position={...START};g.direction=0;g.message='Repli à l’entrée. Les ennemis non vaincus ont retrouvé leurs forces.';}
+export function retreat(g:Game){if(g.phase!=='combat')return;g.phase='explore';g.battle=null;g.feedback=[];g.position={...START};g.direction=0;g.message='Back at the entrance. Undefeated enemies have recovered.';}

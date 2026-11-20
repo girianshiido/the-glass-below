@@ -1,71 +1,66 @@
-# Hollow Depths — Les Cryptes de Verre
+# The Glass Below
 
-Un nouveau jeu de rôle autonome pour navigateur et mobile. L’exploration utilise une véritable scène WebGL à la première personne : murs, sols, plafonds, profondeur, éclairage et brouillard. Les créatures sont des illustrations 2D animées intégrées à la scène, visibles à distance et masquées par les murs.
+An original first-person dungeon RPG for phones, tablets and desktop browsers. TypeScript strict mode, Vite and a small WebGL renderer; no game server, account or telemetry.
 
-## Prototype 0.1
+## Prototype 0.3
 
-- Un labyrinthe conçu à la main : chemins alternatifs, coffre, clé, grille, source et sortie.
-- Deux aventuriers, Kaël et Lys, et trois créatures originales avec cinq poses chacune.
-- Six rencontres, dont un gardien final et des groupes de deux ennemis.
-- Attaques normales automatiques ; Fracture, Éclat de givre et Sceau de soin manuels.
-- Pause tactique, préparation d’un ordre par aventurier, ciblage et vitesse ×1 / ×2.
-- Intentions ennemies visibles, interruptions, immobilisation, impacts et récupération après victoire.
-- Carte découverte progressivement, commandes clavier et tactiles, sauvegarde locale avec export/import.
-- PWA hors ligne après une première visite connectée complète, avec mises à jour explicites.
-- Aucun bruitage ni musique pour cette première étape.
+Explore the Glass Crypts, find the copper key, unlock the eastern gate and defeat the Faceless Warden. The hand-built level includes alternative paths, six encounters, a chest, a restorative spring and a final exit. Illustrated creatures stand inside a true 3D environment and are hidden correctly by walls.
 
-L’univers et le bestiaire sont originaux. Hollow Oath constitue une référence pour le style illustré et le rythme des combats ; Dinosaur Resurrection constitue une référence uniquement pour la vue 3D pendant l’exploration. Aucun de leurs fichiers graphiques n’est utilisé dans cette version.
+Kael and Lys attack automatically. Fracture, Frost Shard and Mending Seal remain manual. Tactical pause freezes combat and lets you queue one skill per hero. Targeting, interrupts, freezing and combat speed ×1 / ×2 are supported.
 
-## Jouer immédiatement
+- Three original illustrated creatures, five poses each.
+- Four physical impact drawings, plus distinct ice, healing, fracture and enemy-hit effects.
+- Animated spell particles, damage numbers, hit reactions and camera feedback.
+- Eleven original sound effects and three original looping scores: exploration, combat and boss.
+- Global mute, independent music/effect levels, background suspension and iOS-friendly OGG/AAC fallback.
+- Fully English interface; level title fades after entry, other notices expire, objectives live in the map/menu.
+- Portrait and landscape phone layouts with touch targets of at least 44 px, plus wide tablet/desktop layouts.
+- Local versioned saves, validated export/import, and offline PWA after the first complete online visit.
 
-Ouvrir `release/Hollow-Depths.html` dans un navigateur récent : cette copie autonome intègre tous les graphismes et fonctionne sans installation ni serveur. WebGL doit être disponible. La PWA et son installation nécessitent la version servie en HTTP(S).
+The working title is independent of Hollow Oath. Hollow Oath informed the illustrated style and combat rhythm; Dinosaur Resurrection informed only the exploration perspective. No artwork or music from either game is included.
 
-## Développement
+## Play
 
-Node.js 24 recommandé, pnpm 10.
+For a self-contained offline copy, open `release/The-Glass-Below.html` in a recent browser. It embeds the artwork and both audio codecs. Sound starts after a user gesture. Installation as a PWA requires an HTTPS deployment.
+
+## Development
+
+Node.js 24 and pnpm 10 are recommended.
 
 ```sh
 pnpm install --frozen-lockfile
 pnpm dev
 pnpm test
 pnpm build
-node scripts/build-standalone.mjs
 ```
 
-Le rendu 3D est un petit moteur WebGL sans bibliothèque externe. Le moteur de combat, le monde, le rendu, l’interface et la persistance sont séparés. TypeScript strict et Vite sont employés pour la compilation et le développement. Tous les éléments du jeu sont locaux, sans compte, serveur de jeu ni télémétrie.
+The production build runs strict TypeScript checks, compiles into `dist/`, creates the offline cache and packages the standalone HTML. Browser code is in `src/`; authoring scripts are in `scripts/`. The Python audio-authoring script requires numpy and ffmpeg; neither is needed to play or build the game normally. All graphics, sound effects and scores are local files.
 
-## Commandes
-
-| Action | Clavier |
+| Action | Keyboard |
 | --- | --- |
-| Avancer / reculer | Z ou W / S, ou flèches haut / bas |
-| Pivoter à gauche / droite | Flèches gauche / droite |
-| Pas à gauche / droite | Q ou A / D |
-| Interagir | E |
-| Carte | M |
-| Pause tactique / reprise | Espace |
-| Fracture / givre / soin | 1 / 2 / 3 |
-| Cible suivante | Tab |
+| Forward / backward | W or Z / S, or Up / Down |
+| Turn left / right | Left / Right |
+| Step sideways | A or Q / D |
+| Interact | E |
+| Map | M |
+| Pause / resume | Space |
+| Fracture / Frost Shard / Mending Seal | 1 / 2 / 3 |
+| Next living target | Tab |
 
-En pause, tous les délais du combat sont figés. Un clic prépare une compétence ; un second clic sur la même compétence annule cet ordre. Un nouvel ordre pour le même aventurier remplace le précédent. Les PM sont consommés à l’exécution après la reprise. Un délai de 0,65 seconde sépare les compétences. Fermer le guide ou la carte ne reprend pas automatiquement un combat mis en pause.
+While paused, selecting a skill queues it; selecting it again cancels it. A new order replaces that hero’s previous order. MP is spent at execution after resuming, with a 0.65-second interval between skills. Combat effects freeze too; the music is ducked. Opening the map or menu pauses combat and does not resume it automatically.
 
-La sauvegarde automatique conserve l’état au début d’un combat, puis la victoire. Elle ne permet pas d’exploiter un rechargement pour conserver les dégâts infligés à un ennemi. Les sauvegardes sont versionnées ; les fichiers importés sont validés avant remplacement. Le menu d’import et de nouvelle partie demande une confirmation avant d’écraser la progression.
+Victory restores 18 HP and 10 MP per hero. The spring fully restores the group once. Retreat preserves current HP and MP but resets undefeated enemies. Saves retain the checkpoint at the start of a fight and update after victory. The original save key and version remain compatible with prototype 0.1; the menu can import its exported saves.
 
 ## GitHub Pages
 
-Le workflow `.github/workflows/deploy.yml` teste et compile le projet, puis déploie `dist/` à chaque push sur `main`. Dans les paramètres du dépôt, choisir **Pages → Source → GitHub Actions**. Les chemins sont relatifs et fonctionnent sous un sous-répertoire. Pour créer le dépôt depuis ce dossier avec GitHub CLI authentifié :
+`.github/workflows/deploy.yml` runs the tests, builds, and deploys `dist/` on pushes to `main`. Pages must use **GitHub Actions** as its source. Relative paths support deployment beneath `/the-glass-below/`. The service worker scopes its cache by URL path and never resets player progress.
 
-```sh
-gh repo create hollow-depths --public --source=. --remote=origin --push
-gh api repos/{owner}/hollow-depths/pages --method POST --field build_type=workflow
-```
+## Verification
 
-## Vérification
+The automated suite covers world connectivity and gate requirements, a complete expedition, combat pause, queued actions, cooldowns, interrupts, targeting, save validation, transient captions, impact projection, codec fallback, music transitions, duplicate playback prevention, mute and background audio handling. Audio assets are also independently probed for valid codecs and duration.
 
-`pnpm test` vérifie la topologie du labyrinthe et de la grille, les collisions, les rencontres, la pause complète, les ordres préparés, les coûts et délais, les interruptions, les cibles, les récompenses, la source, les sauvegardes et la possibilité de vaincre chaque type d’adversaire.
+Browser layout checks cover iPhone-sized portrait/landscape views, a large tablet and desktop. Real-device Safari audio behavior, performance and PWA installation still require physical-device checks.
 
-Les essais sur iPhone SE et tablette Android restent nécessaires pour évaluer les performances réelles et l’installation PWA. Cette version est un premier niveau jouable, pas un RPG complet.
+## Original assets
 
-## Graphismes
-
-`public/art/bestiary.png` est une planche originale générée pour ce projet : cinq poses, trois créatures. Les coordonnées de la planche sont définies par le rendu. Les textures architecturales et les effets sont créés par le code. Aucun son n’est chargé.
+`public/art/bestiary.png` contains five poses for each of three creatures. `public/art/impacts.png` contains eight illustrated impact/spell sprites. Music and effects were composed/synthesized for this project by `scripts/compose-audio.py`; `public/audio/manifest.json` records exact loop durations and audio levels. Architectural textures, lighting, particles and app icons are generated by code.
