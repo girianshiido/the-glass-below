@@ -2,14 +2,14 @@
 
 An original first-person dungeon RPG for phones, tablets and desktop browsers. TypeScript strict mode, Vite and a small WebGL renderer; no game server, account or telemetry.
 
-## Prototype 0.5
+## Prototype 0.6
 
 Explore the Glass Crypts, find the copper key, unlock the eastern gate and defeat the Faceless Warden. The hand-built level includes alternative paths, six encounters, a chest, a restorative spring and a final exit. Illustrated creatures stand inside a true 3D environment and are hidden correctly by walls.
 
-Kael and Lys attack automatically. Fracture, Frost Shard and Mending Seal remain manual. Tactical pause freezes combat and lets you queue one skill per hero. Interrupts, freezing and combat speed ×1 / ×2 are supported. Encounters with reinforcements now present opponents one at a time at normal size, both in the corridor and in combat. A small counter shows 1 / 2, then 2 / 2; the second opponent arrives after the first fades. HP, MP and skill cooldowns carry over, and rewards are granted only after the entire encounter.
+Kael and Lys attack automatically. Fracture, Frost Shard and Mending Seal remain manual. Tactical pause freezes combat and lets you queue one skill per hero. Interrupts, freezing and combat speed ×1 / ×2 are supported. Every encounter contains exactly one full-size opponent. Defeating it clears the passage permanently; no identical replacement appears.
 
 - Three original illustrated creatures, five poses each.
-- Four short, thin blade-stroke variants with small sparks, plus distinct ice, healing, fracture and enemy-hit effects.
+- Four thin blade-stroke variants, enlarged by 60% with longer visibility and small sparks, plus distinct ice, healing, fracture and enemy-hit effects.
 - Individually cropped creature poses and combat framing that keeps the current opponent above a compact enemy-information dock.
 - Animated spell particles, damage numbers, hit reactions and camera feedback.
 - Eleven original sound effects and three original looping scores: exploration, combat and boss.
@@ -59,13 +59,13 @@ Victory restores 18 HP and 10 MP per hero. The spring fully restores the group o
 
 ## Verification
 
-The 33 automated tests cover world connectivity and gate requirements, a complete expedition, combat pause, queued actions, cooldowns, interrupts, targeting, save validation, transient captions, impact projection, all fifteen creature-frame bounds, full-size framing across phone and desktop sizes, inactive reserves, paused wave transitions and rewards after the final opponent, thin impact strokes, codec fallback, music transitions, duplicate playback prevention, mute and background audio handling. Audio assets are also independently probed for valid codecs and duration.
+The 32 automated tests cover world connectivity and gate requirements, a complete expedition, combat pause, queued actions, cooldowns, interrupts, targeting, save validation, transient captions, impact projection, all fifteen creature-frame bounds, full-size framing across phone and desktop sizes, one opponent per encounter, definitive victory and cleared encounters remaining empty, thin impact strokes, codec fallback, music transitions, duplicate playback prevention, mute and background audio handling. Audio assets are also independently probed for valid codecs and duration.
 
 Browser layout checks cover iPhone-sized portrait/landscape views, a large tablet and desktop. Real-device Safari audio behavior, performance and PWA installation still require physical-device checks.
 
-The 375 × 550 portrait view with the second full-size opponent:
+Larger physical impacts, with thin strokes retained:
 
-![Full-size reinforcements on mobile](docs/reinforcements-mobile.jpg)
+![Larger blade impact](docs/larger-impact.jpg)
 
 ## Original assets
 

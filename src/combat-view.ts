@@ -12,7 +12,7 @@ export function creatureFrame(kind:CreatureKind,pose:number){
   const [left,top,right,bottom]=rect;
   return{width:(right-left)*unit,height:(bottom-top)*unit,uv:[(left+.5)/ATLAS_SIZE[0],1-(bottom-.5)/ATLAS_SIZE[1],(right-.5)/ATLAS_SIZE[0],1-(top+.5)/ATLAS_SIZE[1]]};
 }
-/** Keep every pose inside the visible scene and inside the corridor, without changing scale for reinforcements. */
+/** Keep every pose inside the visible scene and inside the corridor, at its normal size. */
 export function creatureLayout(kind:CreatureKind,width:number,height:number,depth:number,insets:CombatInsets=DEFAULT_INSETS):CreatureLayout{
   const frames=CREATURE_FRAMES[kind].map((_,pose)=>creatureFrame(kind,pose));
   const maxHeight=Math.max(...frames.map(f=>f.height)),maxWidth=Math.max(...frames.map(f=>f.width));

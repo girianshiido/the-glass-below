@@ -21,7 +21,7 @@ test('Settings are validated and clamped without losing the global mute',()=>{
 });
 test('Music follows exploration, ordinary combat and boss combat; never the title or outcome',()=>{
  const g=createGame();assert.equal(musicScene(g,false),null);assert.equal(musicScene(g,true),'level');
- beginBattle(g,{id:'test',x:4,y:1,kind:'scavenger',count:1});assert.equal(musicScene(g,true),'combat');
+ beginBattle(g,{id:'test',x:4,y:1,kind:'scavenger'});assert.equal(musicScene(g,true),'combat');
  g.battle.enemies[0].kind='sentinel';assert.equal(musicScene(g,true),'boss');g.phase='victory';assert.equal(musicScene(g,true),null);
 });
 test('Repeated gestures and same-scene updates never start duplicate music',async()=>{

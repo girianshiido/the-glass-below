@@ -21,14 +21,14 @@ export const DIRECTIONS = [[1,0],[0,1],[-1,0],[0,-1]] as const;
 export const CARDINALS = ['E','S','W','N'];
 export interface Point { x:number; y:number }
 export type CreatureKind = 'scavenger'|'wraith'|'sentinel';
-export interface EncounterDef extends Point { id:string; kind:CreatureKind; count:number }
+export interface EncounterDef extends Point { id:string; kind:CreatureKind }
 export const ENCOUNTERS:EncounterDef[] = [
-  {id:'first',x:5,y:1,kind:'scavenger',count:1},
-  {id:'watch',x:3,y:5,kind:'wraith',count:1},
-  {id:'pair',x:7,y:7,kind:'scavenger',count:2},
-  {id:'passage',x:9,y:3,kind:'wraith',count:1},
-  {id:'vault',x:15,y:5,kind:'wraith',count:2},
-  {id:'guardian',x:17,y:11,kind:'sentinel',count:1},
+  {id:'first',x:5,y:1,kind:'scavenger'},
+  {id:'watch',x:3,y:5,kind:'wraith'},
+  {id:'pair',x:7,y:7,kind:'scavenger'},
+  {id:'passage',x:9,y:3,kind:'wraith'},
+  {id:'vault',x:15,y:5,kind:'wraith'},
+  {id:'guardian',x:17,y:11,kind:'sentinel'},
 ];
 export const CHEST:Point={x:5,y:3};
 export const GATE:Point={x:17,y:9};

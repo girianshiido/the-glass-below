@@ -9,9 +9,9 @@ export interface EffectSpec {cell:number;duration:number;sound:Sound;rotation:nu
 export function effectFor(f:Feedback):EffectSpec{
   if(f.kind==='ice')return{cell:4,duration:.65,sound:'frost',rotation:0,art:'atlas'};
   if(f.kind==='heal')return{cell:5,duration:.9,sound:'heal',rotation:0,art:'atlas'};
-  if(f.kind==='break')return{cell:6,duration:.34,sound:'fracture',rotation:0,art:'stroke'};
-  if(f.kind==='hurt')return{cell:7,duration:.24,sound:'hit',rotation:(f.id%3-1)*13,art:'stroke'};
-  const variant=f.id%4;return{cell:variant,duration:.23+variant*.015,sound:`slash-${variant+1}`as Sound,rotation:(f.id%5-2)*8,art:'stroke'};
+  if(f.kind==='break')return{cell:6,duration:.4,sound:'fracture',rotation:0,art:'stroke'};
+  if(f.kind==='hurt')return{cell:7,duration:.32,sound:'hit',rotation:(f.id%3-1)*13,art:'stroke'};
+  const variant=f.id%4;return{cell:variant,duration:.32+variant*.02,sound:`slash-${variant+1}`as Sound,rotation:(f.id%5-2)*8,art:'stroke'};
 }
 /** Project impacts onto the creature, independent of viewport aspect ratio. */
 export function impactAnchor(g:Game,camera:Camera,width:number,height:number,f:Feedback,insets:CombatInsets=DEFAULT_INSETS){
@@ -51,7 +51,7 @@ export class CombatEffects {
       const attack=Math.min(1,t/.11),fade=t>.48?Math.pow((1-t)/.52,1.3):1;
       const scale=fx.spec.art==='stroke'||reduced?1:fx.kind==='heal'?.85+Math.sin(t*Math.PI/2)*.2:.7+Math.min(1,t*5)*.3;
       if(fx.context)drawThinImpact(fx.context,fx.variant,t,fx.size,fx.kind==='break'?'break':fx.kind==='hurt'?'hurt':'hit',!reduced);
-      fx.element.style.opacity=String(attack*fade);fx.element.style.transform=`translate(-50%,-50%) rotate(${fx.spec.rotation+(fx.kind==='heal'&&!reduced?t*28:0)}deg) scale(${scale})`;
+      fx.element.style.opacity=String(fx.spec.art==='stroke'?attack:attack*fade);fx.element.style.transform=`translate(-50%,-50%) rotate(${fx.spec.rotation+(fx.kind==='heal'&&!reduced?t*28:0)}deg) scale(${scale})`;
       fx.number.style.opacity=String(Math.min(1,t*8)*Math.min(1,(1-t)*3));fx.number.style.transform=`translate(-50%,${reduced?-20:-10-t*65}px)`;
       fx.particles.forEach((p,n)=>{const angle=n*Math.PI/4,travel=reduced?20:t*(fx.kind==='heal'?65:105),up=fx.kind==='heal'?-t*35:t*t*28;p.style.transform=`translate(${Math.cos(angle)*travel}px,${Math.sin(angle)*travel+up}px) rotate(${n*45+t*160}deg)`;p.style.opacity=String(fade*(1-t));});
     }

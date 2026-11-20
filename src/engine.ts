@@ -4,7 +4,7 @@ export type Phase='explore'|'combat'|'victory'|'defeat'|'complete';
 export type Skill='fracture'|'frost'|'heal';
 export interface Hero {name:string;hp:number;maxHp:number;mp:number;maxMp:number;clock:number;attack:number}
 export interface Enemy {id:number;kind:CreatureKind;name:string;hp:number;maxHp:number;clock:number;windup:number;hurtAt:number;strikeAt:number;deathAt:number;stunned:number;target:number}
-export interface Battle {encounter:string;enemies:Enemy[];wave:number;nextWaveAt:number|null;target:number;time:number;paused:boolean;speed:number;queue:Skill[];cooldowns:Record<Skill,number>;shield:number;globalCooldown:number}
+export interface Battle {encounter:string;enemies:Enemy[];target:number;time:number;paused:boolean;speed:number;queue:Skill[];cooldowns:Record<Skill,number>;shield:number;globalCooldown:number}
 export interface Feedback {id:number;kind:'hit'|'hurt'|'heal'|'ice'|'break'|'guard';text:string;enemy?:number;hero?:number;time:number}
 export interface Game {phase:Phase;position:Point;direction:number;heroes:Hero[];battle:Battle|null;cleared:Set<string>;seen:Set<string>;key:boolean;gateOpen:boolean;chestOpen:boolean;shrineUsed:boolean;gold:number;message:string;feedback:Feedback[];eventId:number;playTime:number}
 export const CREATURES:Record<CreatureKind,{name:string;hp:number;attack:number;period:number;windup:number;skill:string;tip:string;row:number}>={
@@ -28,7 +28,7 @@ function emit(g:Game,kind:Feedback['kind'],text:string,enemy?:number,hero?:numbe
 export function beginBattle(g:Game,encounter:EncounterDef){
   if(g.phase!=='explore'||g.cleared.has(encounter.id))return false;
   const d=CREATURES[encounter.kind];
-  g.battle={encounter:encounter.id,enemies:Array.from({length:encounter.count},(_,i)=>({id:i,kind:encounter.kind,name:d.name,hp:d.hp,maxHp:d.hp,clock:0,windup:0,hurtAt:-100,strikeAt:-100,deathAt:-100,stunned:0,target:i%2})),wave:0,nextWaveAt:null,target:0,time:0,paused:false,speed:1,queue:[],cooldowns:{fracture:0,frost:0,heal:0},shield:0,globalCooldown:0};
+  g.battle={encounter:encounter.id,enemies:[{id:0,kind:encounter.kind,name:d.name,hp:d.hp,maxHp:d.hp,clock:0,windup:0,hurtAt:-100,strikeAt:-100,deathAt:-100,stunned:0,target:0}],target:0,time:0,paused:false,speed:1,queue:[],cooldowns:{fracture:0,frost:0,heal:0},shield:0,globalCooldown:0};
   g.heroes.forEach(h=>h.clock=0);g.feedback=[];g.phase='combat';g.message=d.tip;return true;
 }
 export function encounterAhead(g:Game){
@@ -62,8 +62,8 @@ export function interact(g:Game){
   if(!g.gateOpen&&Math.abs(g.position.x-GATE.x)+Math.abs(g.position.y-GATE.y)===1){if(g.key){g.gateOpen=true;reveal(g.seen,g.position,true);g.message='The gate opens.';}else g.message='You need the copper key.';return;}
   g.message=locationHint(g);
 }
-/** Only the current opponent is present; reserves arrive after the death animation. */
-export function visibleEnemy(b:Battle){return b.enemies[b.wave];}
+/** Every encounter has one opponent. */
+export function visibleEnemy(b:Battle){return b.enemies[0];}
 export function livingTarget(g:Game){const b=g.battle;if(!b)return undefined;const e=visibleEnemy(b);return e?.hp>0?e:undefined;}
 export function selectTarget(g:Game,id:number){const e=livingTarget(g);if(g.phase==='combat'&&e?.id===id)g.battle!.target=id;}
 function damage(g:Game,e:Enemy,value:number,kind:Feedback['kind']='hit'){
@@ -103,7 +103,6 @@ function resolve(g:Game){
     for(const h of g.heroes){h.hp=Math.min(h.maxHp,Math.max(h.hp,1)+18);h.mp=Math.min(h.maxMp,h.mp+10);}
     g.message=boss?'The Warden has fallen. The exit lies ahead.':'Passage cleared · +18 HP and +10 MP each';
   }else if(g.heroes.every(h=>h.hp<=0)){g.phase='defeat';b.paused=false;b.queue=[];g.message='Your expedition ends here. Return to the last saved checkpoint.';}
-  else if(visibleEnemy(b).hp<=0){if(b.nextWaveAt===null){b.nextWaveAt=b.time+.8;b.queue=[];}}
   else b.target=visibleEnemy(b).id;
 }
 export function tick(g:Game,dt:number){
@@ -116,18 +115,12 @@ export function tick(g:Game,dt:number){
     const step=Math.min(remaining,1/60);remaining-=step;b.time+=step;g.playTime+=step;
     b.globalCooldown=Math.max(0,b.globalCooldown-step);
     for(const skill of Object.keys(SKILLS)as Skill[])b.cooldowns[skill]=Math.max(0,b.cooldowns[skill]-step);
-    if(b.nextWaveAt!==null){
-      if(b.time>=b.nextWaveAt){b.wave++;b.nextWaveAt=null;b.target=visibleEnemy(b).id;g.heroes.forEach(h=>h.clock=0);g.message='';}
-      continue;
-    }
     if(b.queue.length&&b.globalCooldown<=0){const skill=b.queue.shift()!;execute(g,skill);if(g.phase!=='combat')break;}
-    if(b.nextWaveAt!==null)continue;
     for(const h of g.heroes){
       if(h.hp<=0)continue;h.mp=Math.min(h.maxMp,h.mp+step*.25);h.clock+=step;
-      if(h.clock>=2.2){h.clock-=2.2;const e=livingTarget(g);if(e)damage(g,e,h.attack);resolve(g);if(g.phase!=='combat'||b.nextWaveAt!==null)break;}
+      if(h.clock>=2.2){h.clock-=2.2;const e=livingTarget(g);if(e)damage(g,e,h.attack);resolve(g);if(g.phase!=='combat')break;}
     }
     if(g.phase!=='combat')break;
-    if(b.nextWaveAt!==null)continue;
     for(const e of [visibleEnemy(b)]){
       if(e.hp<=0)continue;
       if(e.stunned>0){e.stunned=Math.max(0,e.stunned-step);continue;}

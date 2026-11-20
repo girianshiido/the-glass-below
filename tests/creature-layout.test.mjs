@@ -33,7 +33,7 @@ test('Every pose stays above the enemy dock and below the toolbar, at full oppon
 });
 test('Physical impacts are short vector strokes, not the thick sprite illustrations',()=>{
  for(const kind of ['hit','hurt','break'])for(let id=0;id<4;id++){
-  const spec=effectFor({kind,id,text:'',time:0});assert.equal(spec.art,'stroke');assert(spec.duration<=.35);
+  const spec=effectFor({kind,id,text:'',time:0});assert.equal(spec.art,'stroke');assert(spec.duration<=.45);
  }
  assert.equal(effectFor({kind:'ice',id:1,text:'',time:0}).art,'atlas');
 });
