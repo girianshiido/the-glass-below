@@ -1,0 +1,53 @@
+{
+  "level": {
+    "seconds": 53.3333125,
+    "loop_seconds": 53.3333125,
+    "bpm": 72,
+    "sample_rate": 48000,
+    "channels": 2,
+    "notes": 88,
+    "peak": 0.6271631834760184,
+    "rms": 0.13999999999999999,
+    "seam_jump": 0.005999872886377211,
+    "renderer": "FluidSynth",
+    "soundfont": "MuseScore_General_HQ.sf2",
+    "decoded_peaks": {
+      "ogg": 0.6380698084831238,
+      "m4a": 0.628250002861023
+    }
+  },
+  "combat": {
+    "seconds": 24.8275625,
+    "loop_seconds": 24.8275625,
+    "bpm": 116,
+    "sample_rate": 48000,
+    "channels": 2,
+    "notes": 372,
+    "peak": 0.76,
+    "rms": 0.10888244944092758,
+    "seam_jump": 0.0017227979274611407,
+    "renderer": "FluidSynth",
+    "soundfont": "MuseScore_General_HQ.sf2",
+    "decoded_peaks": {
+      "ogg": 0.7538894414901733,
+      "m4a": 0.7633620500564575
+    }
+  },
+  "boss": {
+    "seconds": 21.176458333333333,
+    "loop_seconds": 21.176458333333333,
+    "bpm": 136,
+    "sample_rate": 48000,
+    "channels": 2,
+    "notes": 414,
+    "peak": 0.68,
+    "rms": 0.08338840625043674,
+    "seam_jump": 0.0004766076747853513,
+    "renderer": "FluidSynth",
+    "soundfont": "MuseScore_General_HQ.sf2",
+    "decoded_peaks": {
+      "ogg": 0.6800869107246399,
+      "m4a": 0.818836510181427
+    }
+  }
+}

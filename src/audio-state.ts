@@ -13,7 +13,7 @@ export function musicScene(g:Game,started:boolean):MusicScene|null{
   return null;
 }
 export const MUSIC_FILES:Record<MusicScene,[string,string]>={level:['./audio/level.ogg','./audio/level.m4a'],combat:['./audio/combat.ogg','./audio/combat.m4a'],boss:['./audio/boss.ogg','./audio/boss.m4a']};
-export const MUSIC_LOOP_SECONDS:Record<MusicScene,number>={level:53.333333333333336,combat:24.827573696145123,boss:21.176462585034013};
+export const MUSIC_LOOP_SECONDS:Record<MusicScene,number>={level:53.3333125,combat:24.8275625,boss:21.176458333333333};
 export const SOUND_FILES:Record<Sound,[string,string]>={
   'slash-1':['./audio/slash-1.ogg','./audio/slash-1.m4a'],
   'slash-2':['./audio/slash-2.ogg','./audio/slash-2.m4a'],
