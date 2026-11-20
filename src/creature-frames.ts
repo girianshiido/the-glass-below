@@ -1,0 +1,103 @@
+// Pixel bounds measured from the original non-uniform sprite atlas.
+// Rectangles are [left, top, right, bottom]; never sample a neighbouring pose.
+import type {CreatureKind} from './world.ts';
+export type SpriteRect=readonly [number,number,number,number];
+export const ATLAS_SIZE=[1619,971] as const;
+export const CREATURE_FRAMES:Record<CreatureKind,readonly SpriteRect[]>={
+  "scavenger": [
+    [
+      10,
+      21,
+      308,
+      279
+    ],
+    [
+      379,
+      24,
+      612,
+      280
+    ],
+    [
+      670,
+      7,
+      937,
+      271
+    ],
+    [
+      981,
+      16,
+      1261,
+      297
+    ],
+    [
+      1338,
+      29,
+      1588,
+      273
+    ]
+  ],
+  "wraith": [
+    [
+      35,
+      303,
+      275,
+      604
+    ],
+    [
+      362,
+      307,
+      604,
+      603
+    ],
+    [
+      661,
+      295,
+      935,
+      603
+    ],
+    [
+      980,
+      307,
+      1285,
+      604
+    ],
+    [
+      1319,
+      317,
+      1588,
+      603
+    ]
+  ],
+  "sentinel": [
+    [
+      20,
+      608,
+      299,
+      957
+    ],
+    [
+      328,
+      612,
+      593,
+      950
+    ],
+    [
+      643,
+      611,
+      942,
+      949
+    ],
+    [
+      975,
+      620,
+      1275,
+      964
+    ],
+    [
+      1302,
+      624,
+      1609,
+      954
+    ]
+  ]
+};
