@@ -21,6 +21,8 @@ The working title is independent of Hollow Oath. Hollow Oath informed the illust
 
 ## Play
 
+[Play The Glass Below](https://girianshiido.github.io/the-glass-below/)
+
 For a self-contained offline copy, open `release/The-Glass-Below.html` in a recent browser. It embeds the artwork and both audio codecs. Sound starts after a user gesture. Installation as a PWA requires an HTTPS deployment.
 
 ## Development
