@@ -6,7 +6,7 @@ export interface Hero {name:string;hp:number;maxHp:number;mp:number;maxMp:number
 export interface Enemy {id:number;kind:CreatureKind;name:string;hp:number;maxHp:number;clock:number;windup:number;hurtAt:number;strikeAt:number;deathAt:number;stunned:number;target:number}
 export interface Battle {encounter:string;enemies:Enemy[];target:number;time:number;paused:boolean;speed:number;queue:Skill[];cooldowns:Record<Skill,number>;shield:number;globalCooldown:number}
 export interface Feedback {id:number;kind:'hit'|'hurt'|'heal'|'ice'|'break'|'guard';text:string;enemy?:number;hero?:number;time:number}
-export interface Game {phase:Phase;position:Point;direction:number;heroes:Hero[];battle:Battle|null;cleared:Set<string>;seen:Set<string>;key:boolean;gateOpen:boolean;chestOpen:boolean;shrineUsed:boolean;gold:number;message:string;feedback:Feedback[];eventId:number;playTime:number}
+export interface Game {phase:Phase;position:Point;direction:number;heroes:Hero[];battle:Battle|null;cleared:Set<string>;roaming:Set<string>;respawnAt:Record<string,number>;seen:Set<string>;key:boolean;gateOpen:boolean;chestOpen:boolean;shrineUsed:boolean;gold:number;message:string;feedback:Feedback[];eventId:number;playTime:number}
 export const CREATURES:Record<CreatureKind,{name:string;hp:number;attack:number;period:number;windup:number;skill:string;tip:string;row:number}>={
   scavenger:{name:'Glass Scavenger',hp:115,attack:12,period:3.6,windup:1.5,skill:'Crystal Bite',tip:'Fracture breaks its crystalline shell.',row:0},
   wraith:{name:'Lantern Watcher',hp:150,attack:22,period:4.8,windup:2.4,skill:'Devouring Light',tip:'Interrupt its spell with Frost Shard.',row:1},
@@ -21,19 +21,32 @@ export function createGame():Game{
   const g:Game={phase:'explore',position:{...START},direction:0,heroes:[
     {name:'Kael',hp:180,maxHp:180,mp:32,maxMp:32,clock:0,attack:12},
     {name:'Lys',hp:140,maxHp:140,mp:44,maxMp:44,clock:.3,attack:9},
-  ],battle:null,cleared:new Set(),seen:new Set(),key:false,gateOpen:false,chestOpen:false,shrineUsed:false,gold:0,message:'',feedback:[],eventId:0,playTime:0};
+  ],battle:null,cleared:new Set(),roaming:new Set(),respawnAt:{},seen:new Set(),key:false,gateOpen:false,chestOpen:false,shrineUsed:false,gold:0,message:'',feedback:[],eventId:0,playTime:0};
   reveal(g.seen,g.position,false);return g;
 }
 function emit(g:Game,kind:Feedback['kind'],text:string,enemy?:number,hero?:number){g.feedback.push({id:++g.eventId,kind,text,enemy,hero,time:g.battle?.time??0});if(g.feedback.length>25)g.feedback.shift();}
+export const PATROL_SITES=['first','pair','passage'] as const;
+export const RESPAWN_DELAY=240;
+export function encounterActive(g:Game,id:string){return !g.cleared.has(id)||g.roaming.has(id);}
+export function updateRespawns(g:Game){
+ if(g.phase!=='explore'||g.roaming.size)return;
+ for(const id of PATROL_SITES){
+  if(!g.cleared.has(id))continue;
+  if(g.respawnAt[id]===undefined){g.respawnAt[id]=g.playTime+RESPAWN_DELAY;continue;}
+  const e=ENCOUNTERS.find(e=>e.id===id)!;
+  if(g.playTime<g.respawnAt[id]||Math.hypot(e.x-g.position.x,e.y-g.position.y)<5||lineOfSight(g.position,e,g.gateOpen))continue;
+  g.roaming.add(id);g.message='Distant footsteps echo through the crypts.';break;
+ }
+}
 export function beginBattle(g:Game,encounter:EncounterDef){
-  if(g.phase!=='explore'||g.cleared.has(encounter.id))return false;
+  if(g.phase!=='explore'||!encounterActive(g,encounter.id))return false;
   const d=CREATURES[encounter.kind];
   g.battle={encounter:encounter.id,enemies:[{id:0,kind:encounter.kind,name:d.name,hp:d.hp,maxHp:d.hp,clock:0,windup:0,hurtAt:-100,strikeAt:-100,deathAt:-100,stunned:0,target:0}],target:0,time:0,paused:false,speed:1,queue:[],cooldowns:{fracture:0,frost:0,heal:0},shield:0,globalCooldown:0};
   g.heroes.forEach(h=>h.clock=0);g.feedback=[];g.phase='combat';g.message=d.tip;return true;
 }
 export function encounterAhead(g:Game){
   const [dx,dy]=DIRECTIONS[g.direction];
-  return ENCOUNTERS.find(e=>!g.cleared.has(e.id)&&e.x===g.position.x+dx&&e.y===g.position.y+dy&&lineOfSight(g.position,e,g.gateOpen));
+  return ENCOUNTERS.find(e=>encounterActive(g,e.id)&&e.x===g.position.x+dx&&e.y===g.position.y+dy&&lineOfSight(g.position,e,g.gateOpen));
 }
 export function move(g:Game,relative:number){
   if(g.phase!=='explore')return false;
@@ -41,7 +54,7 @@ export function move(g:Game,relative:number){
   const next={x:g.position.x+dx,y:g.position.y+dy};
   if(wall(next.x,next.y)){g.message='The way is blocked.';return false;}
   if(same(next,GATE)&&!g.gateOpen){g.message=g.key?'The gate is locked. Interact to use the key.':'A copper key is needed.';return false;}
-  const encounter=ENCOUNTERS.find(e=>!g.cleared.has(e.id)&&same(e,next));
+  const encounter=ENCOUNTERS.find(e=>encounterActive(g,e.id)&&same(e,next));
   if(encounter){g.direction=direction;beginBattle(g,encounter);return false;}
   g.position=next;reveal(g.seen,next,g.gateOpen);g.message=locationHint(g);
   if(same(next,EXIT)&&g.cleared.has('guardian')){g.phase='complete';g.message='Silence returns to the Glass Crypts.';return true;}
@@ -98,16 +111,18 @@ export function togglePause(g:Game){if(g.phase==='combat'&&g.battle){g.battle.pa
 function resolve(g:Game){
   const b=g.battle!;
   if(b.enemies.every(e=>e.hp<=0)){
+    const returning=g.roaming.delete(b.encounter);
+    if(PATROL_SITES.some(id=>id===b.encounter))g.respawnAt[b.encounter]=g.playTime+RESPAWN_DELAY;
     g.cleared.add(b.encounter);g.phase='victory';b.paused=false;b.queue=[];
-    const boss=b.encounter==='guardian';g.gold+=boss?100:20;
-    for(const h of g.heroes){h.hp=Math.min(h.maxHp,Math.max(h.hp,1)+18);h.mp=Math.min(h.maxMp,h.mp+10);}
-    g.message=boss?'The Warden has fallen. The exit lies ahead.':'Passage cleared · +18 HP and +10 MP each';
+    const boss=b.encounter==='guardian';g.gold+=boss?100:returning?10:20;
+    for(const h of g.heroes){h.hp=Math.min(h.maxHp,Math.max(h.hp,1)+(returning?6:18));h.mp=Math.min(h.maxMp,h.mp+(returning?4:10));}
+    g.message=boss?'The Warden has fallen. The exit lies ahead.':returning?'Patrol defeated · +10 shards, +6 HP and +4 MP each':'Passage cleared · +18 HP and +10 MP each';
   }else if(g.heroes.every(h=>h.hp<=0)){g.phase='defeat';b.paused=false;b.queue=[];g.message='Your expedition ends here. Return to the last saved checkpoint.';}
   else b.target=visibleEnemy(b).id;
 }
 export function tick(g:Game,dt:number){
   if(!Number.isFinite(dt)||dt<=0)return;
-  if(g.phase==='explore'){g.playTime+=Math.min(dt,.1);return;}
+  if(g.phase==='explore'){g.playTime+=Math.min(dt,.1);updateRespawns(g);return;}
   const b=g.battle;if(g.phase!=='combat'||!b||b.paused)return;
   const elapsed=Math.min(dt,.1)*b.speed;
   // Fixed micro-steps prevent attack/interrupt races at accelerated speed.

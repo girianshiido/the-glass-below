@@ -2,13 +2,16 @@
 
 An original first-person dungeon RPG for phones, tablets and desktop browsers. TypeScript strict mode, Vite and a small WebGL renderer; no game server, account or telemetry.
 
-## Prototype 0.6
+## Prototype 0.7
 
 Explore the Glass Crypts, find the copper key, unlock the eastern gate and defeat the Faceless Warden. The hand-built level includes alternative paths, six encounters, a chest, a restorative spring and a final exit. Illustrated creatures stand inside a true 3D environment and are hidden correctly by walls.
 
-Kael and Lys attack automatically. Fracture, Frost Shard and Mending Seal remain manual. Tactical pause freezes combat and lets you queue one skill per hero. Interrupts, freezing and combat speed ×1 / ×2 are supported. Every encounter contains exactly one full-size opponent. Defeating it clears the passage permanently; no identical replacement appears.
+Kael and Lys attack automatically. Fracture, Frost Shard and Mending Seal remain manual. Tactical pause freezes combat and lets you queue one skill per hero. Interrupts, freezing and combat speed ×1 / ×2 are supported. Every encounter contains exactly one full-size opponent. Defeating it clears the passage. Three cleared corridors may later receive a returning patrol; these are separate encounters after a four-minute cooldown, never an immediate replacement.
 
-- Three original illustrated creatures, five poses each.
+- Three original illustrated creatures, five poses each; their artwork is unchanged.
+- Detailed procedural stone, inset floor medallions, projecting plinths and cornices, vault ribs, bronze fittings, animated flame sconces and warm torch lighting against cool shadows.
+- Patinated-metal controls, framed minimap and polished combat cards.
+- A permanent **Check for updates** menu button reports current, available, offline and error states; activation remains an explicit **Apply update** action.
 - Four thin blade-stroke variants, enlarged by 60% with longer visibility and small sparks, plus distinct ice, healing, fracture and enemy-hit effects.
 - Individually cropped creature poses and combat framing that keeps the current opponent above a compact enemy-information dock.
 - Animated spell particles, damage numbers, hit reactions and camera feedback.
@@ -53,19 +56,25 @@ While paused, selecting a skill queues it; selecting it again cancels it. A new 
 
 Victory restores 18 HP and 10 MP per hero. The spring fully restores the group once. Retreat preserves current HP and MP but resets undefeated enemies. Saves retain the checkpoint at the start of a fight and update after victory. The original save key and version remain compatible with prototype 0.1; the menu can import its exported saves.
 
+## Returning patrols
+
+The entrance corridor (`first`), central passage (`pair`) and eastern passage (`passage`) can repopulate four minutes after victory, measured in active game time. A site must be at least five tiles away and outside line of sight; only one returning patrol can be present. The boss and the other two encounters never respawn. First-clear progress, the key, the gate and the spring are preserved. A returning patrol grants 10 shards, 6 HP and 4 MP per hero; victory starts a fresh cooldown. Timers and active patrols survive saves and imports. Older saves receive a fresh four-minute grace period.
+
 ## GitHub Pages
 
 `.github/workflows/deploy.yml` runs the tests, builds, and deploys `dist/` on pushes to `main`. Pages must use **GitHub Actions** as its source. Relative paths support deployment beneath `/the-glass-below/`. The service worker scopes its cache by URL path and never resets player progress.
 
 ## Verification
 
-The 32 automated tests cover world connectivity and gate requirements, a complete expedition, combat pause, queued actions, cooldowns, interrupts, targeting, save validation, transient captions, impact projection, all fifteen creature-frame bounds, full-size framing across phone and desktop sizes, one opponent per encounter, definitive victory and cleared encounters remaining empty, thin impact strokes, codec fallback, music transitions, duplicate playback prevention, mute and background audio handling. Audio assets are also independently probed for valid codecs and duration.
+The 38 automated tests cover world connectivity and gate requirements, a complete expedition, combat pause, queued actions, cooldowns, interrupts, targeting, save validation, transient captions, impact projection, all fifteen creature-frame bounds, full-size framing across phone and desktop sizes, one opponent per encounter, patrol cooldowns, off-screen spawn rules, reduced repeat rewards, legacy-save migration and update-check states, thin impact strokes, codec fallback, music transitions, duplicate playback prevention, mute and background audio handling. Audio assets are also independently probed for valid codecs and duration.
 
 Browser layout checks cover iPhone-sized portrait/landscape views, a large tablet and desktop. Real-device Safari audio behavior, performance and PWA installation still require physical-device checks.
 
-Larger physical impacts, with thin strokes retained:
+The updated dungeon and interface:
 
-![Larger blade impact](docs/larger-impact.jpg)
+![Updated crypt architecture and lighting](docs/crypts-upgrade.jpg)
+
+![Permanent update check](docs/update-menu.jpg)
 
 ## Original assets
 

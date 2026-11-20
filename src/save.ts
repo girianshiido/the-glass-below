@@ -1,8 +1,8 @@
-import {createGame} from './engine.ts';
+import {createGame,PATROL_SITES,RESPAWN_DELAY} from './engine.ts';
 import type {Game} from './engine.ts';
 import {wall,ENCOUNTERS,WIDTH,HEIGHT,GATE,same} from './world.ts';
 const KEY='hollow-depths:save:v1';
-export function serialize(g:Game){return JSON.stringify({version:1,position:g.position,direction:g.direction,heroes:g.heroes.map(h=>({hp:h.hp,mp:h.mp})),cleared:[...g.cleared],seen:[...g.seen],key:g.key,gateOpen:g.gateOpen,chestOpen:g.chestOpen,shrineUsed:g.shrineUsed,gold:g.gold,playTime:g.playTime,complete:g.phase==='complete'});}
+export function serialize(g:Game){return JSON.stringify({version:1,position:g.position,direction:g.direction,heroes:g.heroes.map(h=>({hp:h.hp,mp:h.mp})),cleared:[...g.cleared],roaming:[...g.roaming],respawnAt:g.respawnAt,seen:[...g.seen],key:g.key,gateOpen:g.gateOpen,chestOpen:g.chestOpen,shrineUsed:g.shrineUsed,gold:g.gold,playTime:g.playTime,complete:g.phase==='complete'});}
 export function deserialize(raw:string):Game|null{
   try{
     const s=JSON.parse(raw);if(s.version!==1||!s.position||!Number.isInteger(s.position.x)||!Number.isInteger(s.position.y)||wall(s.position.x,s.position.y)||!Number.isInteger(s.direction)||s.direction<0||s.direction>3||!Array.isArray(s.heroes)||s.heroes.length!==2)return null;
@@ -15,6 +15,10 @@ export function deserialize(raw:string):Game|null{
     if(!Array.isArray(s.seen)||s.seen.length>WIDTH*HEIGHT||s.seen.some((v:unknown)=>typeof v!=='string'||!/^\d+,\d+$/.test(v)||v.split(',').some((n,i)=>+n>=(i===0?WIDTH:HEIGHT))))return null;
     if(!Number.isFinite(s.gold)||s.gold<0||!Number.isFinite(s.playTime)||s.playTime<0)return null;
     if(typeof s.complete!=='boolean'||s.complete&&!s.cleared.includes('guardian'))return null;
+    if(s.roaming!==undefined&&(!Array.isArray(s.roaming)||s.roaming.length>1||s.roaming.some((id:string)=>!PATROL_SITES.some(site=>site===id)||!s.cleared.includes(id))))return null;
+    if(s.respawnAt!==undefined&&(!s.respawnAt||typeof s.respawnAt!=='object'||Array.isArray(s.respawnAt)||Object.entries(s.respawnAt).some(([id,t])=>!PATROL_SITES.some(site=>site===id)||typeof t!=='number'||!Number.isFinite(t)||t<0)))return null;
+    g.roaming=new Set(s.roaming??[]);g.respawnAt={...s.respawnAt};
+    for(const id of PATROL_SITES)if(s.cleared.includes(id)&&g.respawnAt[id]===undefined)g.respawnAt[id]=s.playTime+RESPAWN_DELAY;
     g.position={...s.position};g.direction=s.direction;g.cleared=new Set(s.cleared);g.seen=new Set(s.seen);g.gold=s.gold;g.playTime=s.playTime;g.phase=s.complete?'complete':'explore';g.message='';return g;
   }catch{return null;}
 }
