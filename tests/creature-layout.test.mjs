@@ -15,21 +15,20 @@ test('Each of the fifteen source rectangles is isolated from every neighbouring 
  assert(CREATURE_FRAMES.wraith[0][3]<CREATURE_FRAMES.sentinel[0][1]);
  assert(CREATURE_FRAMES.wraith.every(rect=>rect[3]<=611));
 });
-test('Every pose stays above the enemy dock and below the toolbar, for singles and pairs',()=>{
+test('Every pose stays above the enemy dock and below the toolbar, at full opponent size',()=>{
  const insets={top:68,bottom:92};
- for(const kind of ['scavenger','wraith','sentinel'])for(const count of [1,2])for(const[width,height]of [[320,220],[375,292],[375,409],[457,320],[1220,1322],[1280,607],[1920,875]])for(const depth of [2.35,2.6]){
-  const layout=creatureLayout(kind,count,width,height,depth,insets),focal=height/(2*Math.tan(VERTICAL_FOV/2));
+ for(const kind of ['scavenger','wraith','sentinel'])for(const[width,height]of [[320,220],[375,292],[375,409],[457,320],[1220,1322],[1280,607],[1920,875]])for(const depth of [2.35,2.6]){
+  const layout=creatureLayout(kind,width,height,depth,insets),focal=height/(2*Math.tan(VERTICAL_FOV/2));
   const ground=height*.5+CAMERA_HEIGHT/depth*focal+layout.shiftY*height*.5;
   assert(Math.abs(ground-layout.bottom)<1e-8);
-  for(let pose=0;pose<5;pose++)for(let i=0;i<count;i++){
+  for(let pose=0;pose<5;pose++){
    const f=creatureFrame(kind,pose),top=ground-f.height*layout.scale/depth*focal;
-   const cx=width*.5+layout.offsets[i]/depth*focal,half=f.width*layout.scale/depth*focal*.5;
+   const cx=width*.5,half=f.width*layout.scale/depth*focal*.5;
    assert(top>=insets.top-1e-7,`${kind} pose ${pose}: head hidden at ${width}x${height}`);
    assert(ground<=height-insets.bottom+1e-7,`${kind}: feet hidden by the dock`);
    assert(cx-half>=16-1e-7&&cx+half<=width-16+1e-7,`${kind}: side clipped`);
   }
-  assert((layout.maxWidth*count+(count-1)*.18)*layout.scale<=2.28+1e-8,'Keep the group within the corridor walls');
-  if(count===2)assert(layout.offsets[1]-layout.offsets[0]>layout.maxWidth*layout.scale,'Pair silhouettes must remain separate');
+  assert(layout.maxWidth*layout.scale<=2.28+1e-8,'Keep the opponent within the corridor walls');
  }
 });
 test('Physical impacts are short vector strokes, not the thick sprite illustrations',()=>{

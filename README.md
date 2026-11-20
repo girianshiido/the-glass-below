@@ -2,15 +2,15 @@
 
 An original first-person dungeon RPG for phones, tablets and desktop browsers. TypeScript strict mode, Vite and a small WebGL renderer; no game server, account or telemetry.
 
-## Prototype 0.4
+## Prototype 0.5
 
 Explore the Glass Crypts, find the copper key, unlock the eastern gate and defeat the Faceless Warden. The hand-built level includes alternative paths, six encounters, a chest, a restorative spring and a final exit. Illustrated creatures stand inside a true 3D environment and are hidden correctly by walls.
 
-Kael and Lys attack automatically. Fracture, Frost Shard and Mending Seal remain manual. Tactical pause freezes combat and lets you queue one skill per hero. Targeting, interrupts, freezing and combat speed ×1 / ×2 are supported.
+Kael and Lys attack automatically. Fracture, Frost Shard and Mending Seal remain manual. Tactical pause freezes combat and lets you queue one skill per hero. Interrupts, freezing and combat speed ×1 / ×2 are supported. Encounters with reinforcements now present opponents one at a time at normal size, both in the corridor and in combat. A small counter shows 1 / 2, then 2 / 2; the second opponent arrives after the first fades. HP, MP and skill cooldowns carry over, and rewards are granted only after the entire encounter.
 
 - Three original illustrated creatures, five poses each.
 - Four short, thin blade-stroke variants with small sparks, plus distinct ice, healing, fracture and enemy-hit effects.
-- Individually cropped creature poses and combat framing that keeps singles and pairs above a compact enemy-information dock.
+- Individually cropped creature poses and combat framing that keeps the current opponent above a compact enemy-information dock.
 - Animated spell particles, damage numbers, hit reactions and camera feedback.
 - Eleven original sound effects and three original looping scores: exploration, combat and boss.
 - Global mute, independent music/effect levels, background suspension and iOS-friendly OGG/AAC fallback.
@@ -48,7 +48,6 @@ The production build runs strict TypeScript checks, compiles into `dist/`, creat
 | Map | M |
 | Pause / resume | Space |
 | Fracture / Frost Shard / Mending Seal | 1 / 2 / 3 |
-| Next living target | Tab |
 
 While paused, selecting a skill queues it; selecting it again cancels it. A new order replaces that hero’s previous order. MP is spent at execution after resuming, with a 0.65-second interval between skills. Combat effects freeze too; the music is ducked. Opening the map or menu pauses combat and does not resume it automatically.
 
@@ -60,13 +59,13 @@ Victory restores 18 HP and 10 MP per hero. The spring fully restores the group o
 
 ## Verification
 
-The 32 automated tests cover world connectivity and gate requirements, a complete expedition, combat pause, queued actions, cooldowns, interrupts, targeting, save validation, transient captions, impact projection, all fifteen creature-frame bounds, single/pair framing across phone and desktop sizes, thin impact strokes, codec fallback, music transitions, duplicate playback prevention, mute and background audio handling. Audio assets are also independently probed for valid codecs and duration.
+The 33 automated tests cover world connectivity and gate requirements, a complete expedition, combat pause, queued actions, cooldowns, interrupts, targeting, save validation, transient captions, impact projection, all fifteen creature-frame bounds, full-size framing across phone and desktop sizes, inactive reserves, paused wave transitions and rewards after the final opponent, thin impact strokes, codec fallback, music transitions, duplicate playback prevention, mute and background audio handling. Audio assets are also independently probed for valid codecs and duration.
 
 Browser layout checks cover iPhone-sized portrait/landscape views, a large tablet and desktop. Real-device Safari audio behavior, performance and PWA installation still require physical-device checks.
 
-The corrected 375 × 550 portrait combat view:
+The 375 × 550 portrait view with the second full-size opponent:
 
-![Mobile combat framing](docs/combat-mobile.jpg)
+![Full-size reinforcements on mobile](docs/reinforcements-mobile.jpg)
 
 ## Original assets
 

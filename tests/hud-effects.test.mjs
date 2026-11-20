@@ -13,7 +13,7 @@ test('Four ordinary impacts vary, while each spell keeps its own visual and soun
  const cells=new Set([0,1,2,3].map(id=>effectFor({id,kind:'hit',text:'−12',time:0}).cell));assert.equal(cells.size,4);
  for(const[kind,cell,sound]of [['ice',4,'frost'],['heal',5,'heal'],['break',6,'fracture'],['hurt',7,'hit']])assert.deepEqual([effectFor({id:1,kind,text:'',time:0}).cell,effectFor({id:1,kind,text:'',time:0}).sound],[cell,sound]);
 });
-test('Impacts follow actual enemy positions across narrow and wide views',()=>{
+test('Impacts stay centred on successive full-size opponents across narrow and wide views',()=>{
  const g=createGame();g.position={x:6,y:7};beginBattle(g,{id:'pair',x:7,y:7,kind:'scavenger',count:2});const camera={x:6,y:7,yaw:0};
- for(const[w,h]of [[375,440],[457,375],[1280,650],[1920,900]]){const a=impactAnchor(g,camera,w,h,{id:1,kind:'hit',enemy:0,time:0,text:''}),b=impactAnchor(g,camera,w,h,{id:2,kind:'hit',enemy:1,time:0,text:''});assert(a.x<50);assert(b.x>50);assert(Math.abs(a.x+b.x-100)<1e-8);assert(a.y>50&&a.y<85);}
+ for(const[w,h]of [[375,440],[457,375],[1280,650],[1920,900]]){const a=impactAnchor(g,camera,w,h,{id:1,kind:'hit',enemy:0,time:0,text:''}),b=impactAnchor(g,camera,w,h,{id:2,kind:'hit',enemy:1,time:0,text:''});assert.equal(a.x,50);assert.equal(b.x,50);assert.equal(a.y,b.y);assert(a.y>50&&a.y<85);}
 });

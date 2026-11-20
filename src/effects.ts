@@ -20,7 +20,7 @@ export function impactAnchor(g:Game,camera:Camera,width:number,height:number,f:F
   const c=Math.cos(camera.yaw),s=Math.sin(camera.yaw),dx=(encounter.x-camera.x)*2.6,dz=(encounter.y-camera.y)*2.6;
   const advance=g.battle?Math.max(0,...g.battle.enemies.map(e=>{const age=g.battle!.time-e.strikeAt;return age>=0&&age<.3?Math.sin(age/.3*Math.PI)*.22:0;})):0;
   const depth=Math.max(.7,c*dx+s*dz-advance),right=-s*dx+c*dz;
-  return projectCreatureCenter(encounter.kind,encounter.count,f.enemy??0,width,height,depth,right,insets);
+  return projectCreatureCenter(encounter.kind,width,height,depth,right,insets);
 }
 interface LiveEffect {element:HTMLDivElement|HTMLCanvasElement;number:HTMLSpanElement;spec:EffectSpec;kind:Feedback['kind'];age:number;particles:HTMLElement[];context?:CanvasRenderingContext2D;size:number;variant:number}
 const ATLAS='./art/impacts.png';

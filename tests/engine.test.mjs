@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {createGame,beginBattle,tick,togglePause,useSkill,SKILLS,move,turn,interact,continueAfterBattle,retreat,selectTarget} from '../src/engine.ts';
+import {createGame,beginBattle,tick,togglePause,useSkill,SKILLS,move,turn,interact,continueAfterBattle,retreat,selectTarget,livingTarget,canUse} from '../src/engine.ts';
 import {MAP,ENCOUNTERS,CHEST,GATE,EXIT,SHRINE,wall,lineOfSight,START,DIRECTIONS} from '../src/world.ts';
 import {serialize,deserialize} from '../src/save.ts';
 const battle=(kind='wraith',count=1)=>{const g=createGame();beginBattle(g,{id:'test',kind,count,x:2,y:1});return g;};
@@ -41,8 +41,18 @@ test('Frost interrupts a telegraphed strike; no damage lands during the stun',()
 test('Cooldowns and mana prevent unlimited casts',()=>{
  const g=battle('sentinel');assert(useSkill(g,'fracture'));assert.equal(useSkill(g,'fracture'),false);advance(g,6);g.heroes[0].mp=0;assert.equal(useSkill(g,'fracture'),false);
 });
-test('Target selection and automatic retargeting skip defeated creatures',()=>{
- const g=battle('scavenger',2);selectTarget(g,1);useSkill(g,'fracture');assert.equal(g.battle.enemies[0].hp,115);assert.equal(g.battle.enemies[1].hp,77);g.battle.enemies[1].hp=1;advance(g,2.3);assert.equal(g.battle.enemies[1].hp,0);assert.equal(g.battle.target,0);
+test('Reinforcements remain untargetable and inactive until the first opponent fades',()=>{
+ const g=battle('scavenger',2),b=g.battle;selectTarget(g,1);assert.equal(b.target,0);
+ advance(g,5);assert.equal(b.enemies[1].clock,0);assert.equal(b.enemies[1].windup,0);assert.equal(b.enemies[1].hp,115);
+ b.enemies[0].hp=1;assert(useSkill(g,'fracture'));assert.equal(g.phase,'combat');assert.equal(livingTarget(g),undefined);assert.equal(canUse(g,'frost'),false);assert.equal(g.gold,0);assert(!g.cleared.has('test'));
+ const hp=g.heroes.map(h=>h.hp),mp=g.heroes.map(h=>h.mp);togglePause(g);const frozen=JSON.stringify(g);advance(g,3);assert.equal(JSON.stringify(g),frozen);togglePause(g);
+ advance(g,.4);assert.equal(b.wave,0);advance(g,.45);assert.equal(b.wave,1);assert.equal(b.target,1);assert.equal(livingTarget(g).id,1);assert.equal(b.nextWaveAt,null);assert.deepEqual(g.heroes.map(h=>h.hp),hp);assert(g.heroes.every((h,i)=>h.mp<mp[i]+.03));assert.equal(b.enemies[1].hp,115);
+ b.enemies[1].hp=1;advance(g,2.3);assert.equal(g.phase,'victory');assert.equal(g.gold,20);assert(g.cleared.has('test'));advance(g,4);assert.equal(g.gold,20);
+});
+test('Queued killing blows wait for reinforcements, and retreat resets the entire encounter',()=>{
+ const g=battle('wraith',2),b=g.battle;b.enemies[0].hp=1;togglePause(g);useSkill(g,'fracture');useSkill(g,'frost');togglePause(g);tick(g,.1);
+ assert.equal(b.enemies[1].hp,150);assert.equal(b.enemies[1].clock,0);assert.equal(g.heroes[1].mp,44);assert.deepEqual(b.queue,[]);
+ retreat(g);assert.equal(g.battle,null);assert(!g.cleared.has('test'));beginBattle(g,{id:'test',kind:'wraith',count:2,x:2,y:1});assert.equal(g.battle.wave,0);assert(g.battle.enemies.every(e=>e.hp===150));
 });
 test('Victory gives rewards once and retains world progress; retreat preserves damage',()=>{
  const g=battle('scavenger');g.battle.enemies[0].hp=1;advance(g,3);assert.equal(g.phase,'victory');const gold=g.gold;advance(g,20);assert.equal(g.gold,gold);assert(g.cleared.has('test'));continueAfterBattle(g);assert.equal(g.phase,'explore');

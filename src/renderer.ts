@@ -1,5 +1,5 @@
 import {MAP,WIDTH,HEIGHT,wall,ENCOUNTERS,CHEST,SHRINE,GATE,EXIT,same} from './world.ts';
-import {CREATURES} from './engine.ts';
+import {CREATURES,visibleEnemy} from './engine.ts';
 import type {Game,Enemy} from './engine.ts';
 import {creatureFrame,creatureLayout,VERTICAL_FOV,CAMERA_HEIGHT,DEFAULT_INSETS} from './combat-view.ts';
 import type {CombatInsets} from './combat-view.ts';
@@ -97,7 +97,7 @@ export class DungeonRenderer {
     const encounter=battle?ENCOUNTERS.find(e=>e.id===battle.encounter):undefined;
     const advance=battle?Math.max(0,...battle.enemies.map(e=>{const age=battle.time-e.strikeAt;return age>=0&&age<.3?Math.sin(age/.3*Math.PI)*.22:0;})):0;
     const depth=encounter?Math.max(.7,(encounter.x*CELL-eye[0])*Math.cos(camera.yaw)+(encounter.y*CELL-eye[2])*Math.sin(camera.yaw)-advance):0;
-    const framing=encounter&&battle?creatureLayout(encounter.kind,encounter.count,this.canvas.clientWidth,this.canvas.clientHeight,depth,this.combatInsets):undefined;
+    const framing=encounter&&battle?creatureLayout(encounter.kind,this.canvas.clientWidth,this.canvas.clientHeight,depth,this.combatInsets):undefined;
     gl.uniformMatrix4fv(this.uniforms.uProjection,false,projection(w/h,framing?.shiftY??0));gl.uniformMatrix4fv(this.uniforms.uView,false,view(eye,camera.yaw+shake*.3));gl.uniform3fv(this.uniforms.uEye,eye);gl.uniform3fv(this.uniforms['uTorches[0]'],this.torches.flat());
     gl.depthMask(true);this.draw(this.floor,this.floorTexture,[.8,.9,.88]);this.draw(this.ceiling,this.wallTexture,[.52,.62,.67]);this.draw(this.walls,this.wallTexture);
     const props:number[]=[];
@@ -111,16 +111,13 @@ export class DungeonRenderer {
     gl.depthMask(false);
     for(const [x,y,z]of this.torches){const flame=this.billboard(x,z,.65+.04*Math.sin(clock*9+x),.9,camera.yaw,[0,0,1,1],y-.2);this.transient(flame,this.glow,[1,.81,.5],2);}
     if(!g.shrineUsed)this.transient(this.billboard(SHRINE.x*CELL,SHRINE.y*CELL,1.1,1.6,camera.yaw,[0,0,1,1],.08),this.glow,[.3,1,1],2,.7);
-    const sprites:{x:number;y:number;kind:keyof typeof CREATURES;enemy?:Enemy;distance:number;offset:number;scale:number}[]=[];
+    const sprites:{x:number;y:number;kind:keyof typeof CREATURES;enemy?:Enemy;distance:number;scale:number}[]=[];
     for(const encounter of ENCOUNTERS){
       const active=battle?.encounter===encounter.id&&(g.phase==='combat'||g.phase==='victory');if(g.cleared.has(encounter.id)&&!active)continue;
-      const layout=active&&framing?framing:creatureLayout(encounter.kind,encounter.count,this.canvas.clientWidth,this.canvas.clientHeight,Math.hypot(encounter.x-camera.x,encounter.y-camera.y)*CELL,{top:0,bottom:0});
-      for(let i=0;i<encounter.count;i++){
-        const enemy=active?battle?.enemies[i]:undefined;if(enemy&&enemy.hp<=0&&battle!.time-enemy.deathAt>.65&&g.phase!=='victory')continue;
-        if(g.phase==='victory'&&active)continue;
-        const offset=layout.offsets[i];
-        sprites.push({x:encounter.x,y:encounter.y,kind:encounter.kind,enemy,distance:Math.hypot(encounter.x-camera.x,encounter.y-camera.y),offset,scale:layout.scale});
-      }
+      const layout=active&&framing?framing:creatureLayout(encounter.kind,this.canvas.clientWidth,this.canvas.clientHeight,Math.hypot(encounter.x-camera.x,encounter.y-camera.y)*CELL,{top:0,bottom:0});
+      const enemy=active?visibleEnemy(battle!):undefined;if(enemy&&enemy.hp<=0&&battle!.time-enemy.deathAt>.65&&g.phase!=='victory')continue;
+      if(g.phase==='victory'&&active)continue;
+      sprites.push({x:encounter.x,y:encounter.y,kind:encounter.kind,enemy,distance:Math.hypot(encounter.x-camera.x,encounter.y-camera.y),scale:layout.scale});
     }
     sprites.sort((a,b)=>b.distance-a.distance);
     if(this.atlas)for(const sprite of sprites){
@@ -128,7 +125,7 @@ export class DungeonRenderer {
       if(e){if(e.hp<=0||battle!.time-e.hurtAt<.24)pose=4;else if(battle!.time-e.strikeAt<.32)pose=3;else if(e.windup>0)pose=2;}
       const frame=creatureFrame(sprite.kind,pose);
       const attack=e&&battle!.time-e.strikeAt<.3?Math.sin((battle!.time-e.strikeAt)/.3*Math.PI)*.22:0;
-      const x=sprite.x*CELL-Math.cos(camera.yaw)*attack-Math.sin(camera.yaw)*sprite.offset,z=sprite.y*CELL-Math.sin(camera.yaw)*attack+Math.cos(camera.yaw)*sprite.offset;
+      const x=sprite.x*CELL-Math.cos(camera.yaw)*attack,z=sprite.y*CELL-Math.sin(camera.yaw)*attack;
       const alpha=e&&e.hp<=0?Math.max(0,1-(battle!.time-e.deathAt)/.65):1;
       const tint:Vec=e&&e.stunned>0?[.56,.94,1]:e&&battle!.time-e.hurtAt<.18?[1.4,.74,.65]:[1,1,1];
       this.transient(this.billboard(x,z,frame.width*sprite.scale,frame.height*sprite.scale,camera.yaw,frame.uv),this.atlas,tint,1,alpha);

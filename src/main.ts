@@ -1,5 +1,5 @@
 import './style.css';
-import {createGame,tick,move,turn,interact,SKILLS,CREATURES,togglePause,useSkill,selectTarget,continueAfterBattle,retreat,livingTarget} from './engine.ts';
+import {createGame,tick,move,turn,interact,SKILLS,CREATURES,togglePause,useSkill,selectTarget,continueAfterBattle,retreat,livingTarget,visibleEnemy,canUse} from './engine.ts';
 import type {Game,Skill} from './engine.ts';
 import {CARDINALS,ENCOUNTERS,MAP} from './world.ts';
 import {GAME_TITLE,LEVEL_TITLE,caption,captionOpacity,objective} from './hud.ts';
@@ -100,7 +100,7 @@ function ui(){
   }
   for(const id of Object.keys(SKILLS)as Skill[]){
     const button=document.querySelector<HTMLButtonElement>(`[data-skill="${id}"]`)!,s=SKILLS[id],cd=b?.cooldowns[id]??0;
-    button.disabled=!fighting||game.heroes[s.hero].hp<=0||game.heroes[s.hero].mp<s.cost||cd>0||(!b!.paused&&b!.globalCooldown>0);
+    button.disabled=!canUse(game,id,!b?.paused);
     button.classList.toggle('is-queued',!!b?.queue.includes(id));button.style.setProperty('--cooldown',`${cd/s.cooldown*100}%`);button.querySelector('.cooldown-label')!.textContent=cd>0?`${cd.toFixed(1)} s`:'';
   }
   $('pause-button').innerHTML=`${icon(b?.paused?'play':'pause')}<span>${b?.paused?'Resume':'Pause'}</span><kbd>Space</kbd>`;
@@ -122,16 +122,22 @@ let enemyMarkup='';
 function updateEnemies(){
   const b=game.battle,container=$('enemy-cards');
   if(game.phase!=='combat'||!b){if(enemyMarkup){container.innerHTML='';enemyMarkup='';}return;}
-  const markup=b.enemies.map(e=>{
-    const d=CREATURES[e.kind],alive=e.hp>0;const intent=e.stunned>0?'Frozen':e.windup>0?`${d.skill} · ${e.kind==='sentinel'?'Party':game.heroes[e.target].name}`:'';
-    const progress=e.windup>0?(1-e.windup/d.windup)*100:e.clock/d.period*100;
-    return `<button class="enemy-card ${e.id===b.target?'selected':''} ${e.windup>0?'danger':''} ${alive?'':'dead'}" data-target="${e.id}" ${alive?'':'disabled'} aria-label="Target ${e.name}: ${Math.ceil(e.hp)} of ${e.maxHp} HP" aria-pressed="${e.id===b.target}"><div><span class="enemy-name">${e.name}</span><span class="target-label">${Math.ceil(e.hp)} / ${e.maxHp}</span></div><div class="enemy-hp"><i style="width:${e.hp/e.maxHp*100}%"></i></div><div class="enemy-meta"><span>${Math.ceil(e.hp)} / ${e.maxHp} HP</span><span>${e.kind==='sentinel'?'WARDEN':'HOSTILE'}</span></div><p>${alive?intent:'Defeated'}</p><div class="intent-meter"><i style="width:${progress}%"></i></div></button>`;
-  }).join('');
-  // Keep target buttons stable while their clocks advance, preserving focus and touch.
-  if(container.children.length!==b.enemies.length){container.innerHTML=markup;enemyMarkup=markup;return;}
-  b.enemies.forEach((e,i)=>{
-    const card=container.children[i]as HTMLButtonElement,d=CREATURES[e.kind];card.className=`enemy-card ${e.id===b.target?'selected':''} ${e.windup>0?'danger':''} ${e.hp<=0?'dead':''}`;card.disabled=e.hp<=0;card.setAttribute('aria-label',`Target ${e.name}: ${Math.ceil(e.hp)} of ${e.maxHp} HP`);card.setAttribute('aria-pressed',String(e.id===b.target));card.querySelector('.target-label')!.textContent=`${Math.ceil(e.hp)} / ${e.maxHp}`;card.querySelector<HTMLElement>('.enemy-hp i')!.style.width=`${e.hp/e.maxHp*100}%`;card.querySelector('.enemy-meta span')!.textContent=`${Math.ceil(e.hp)} / ${e.maxHp} HP`;card.querySelector('p')!.textContent=e.hp<=0?'Defeated':e.stunned>0?'Frozen':e.windup>0?`${d.skill} · ${e.kind==='sentinel'?'Party':game.heroes[e.target].name}`:'';card.querySelector<HTMLElement>('.intent-meter i')!.style.width=`${e.windup>0?(1-e.windup/d.windup)*100:e.clock/d.period*100}%`;
-  });
+  const e=visibleEnemy(b),key=`${b.encounter}:${e.id}`,d=CREATURES[e.kind];
+  if(enemyMarkup!==key){
+    container.innerHTML=`<button class="enemy-card selected" data-target="${e.id}" aria-pressed="true"><div><span class="enemy-name"></span><span class="wave-count"></span><span class="target-label"></span></div><div class="enemy-hp"><i></i></div><p></p><div class="intent-meter"><i></i></div></button>`;
+    enemyMarkup=key;
+  }
+  const card=container.firstElementChild as HTMLButtonElement;
+  card.className=`enemy-card selected ${e.windup>0?'danger':''} ${e.hp<=0?'dead':''}`;card.disabled=e.hp<=0;
+  const round=b.enemies.length>1?`Opponent ${b.wave+1} of ${b.enemies.length}. `:'';
+  card.setAttribute('aria-label',`${round}${e.name}: ${Math.ceil(e.hp)} of ${e.maxHp} HP`);
+  card.querySelector('.enemy-name')!.textContent=e.name;
+  const counter=card.querySelector<HTMLElement>('.wave-count')!;counter.hidden=b.enemies.length===1;counter.textContent=`${b.wave+1} / ${b.enemies.length}`;
+  card.querySelector('.target-label')!.textContent=`${Math.ceil(e.hp)} / ${e.maxHp}`;
+  card.querySelector<HTMLElement>('.enemy-hp i')!.style.width=`${e.hp/e.maxHp*100}%`;
+  card.querySelector('p')!.textContent=e.hp<=0?'Next opponent approaching':e.stunned>0?'Frozen':e.windup>0?`${d.skill} · ${e.kind==='sentinel'?'Party':game.heroes[e.target].name}`:'';
+  card.querySelector<HTMLElement>('.intent-meter i')!.style.width=`${e.windup>0?(1-e.windup/d.windup)*100:e.clock/d.period*100}%`;
+
 }
 function updateOutcome(){
   const out=$('outcome');out.hidden=!['victory','defeat','complete'].includes(game.phase);
@@ -156,8 +162,8 @@ function openMap(){
   showDialog('The Glass Crypts',`<p class="dialog-intro">${objective(game)}</p><canvas id="full-map" aria-label="Map of discovered areas"></canvas><div class="map-legend"><span><i class="legend-player"></i>Party</span><span><i class="legend-enemy"></i>Enemy</span><span><i class="legend-key"></i>Chest</span><span><i class="legend-source"></i>Spring</span></div><p class="fine">${game.gold} shards · ${game.cleared.size} / ${ENCOUNTERS.length} encounters cleared${game.key?' · Copper key':''}</p>`);
   requestAnimationFrame(()=>drawMap($<HTMLCanvasElement>('full-map'),game,true));
 }
-function openHelp(){showDialog('Field guide',`<div class="guide"><h3>Explore</h3><p>Move one tile at a time and turn through 90°. Creatures are visible in the corridors. Combat begins when one is directly in front of you.</p><p><b>Keyboard:</b> W / Z or ↑ to move forward, S or ↓ to move backward, ← / → to turn, A / Q and D to step sideways. E to interact, M for the map. All actions also have touch controls.</p><h3>Fight</h3><p>Kael and Lys attack automatically. Use the three skills with their buttons or keys <b>1, 2 and 3</b>. Select an enemy card to change targets. Tab cycles through living targets.</p><p><b>Space pauses combat.</b> Queue one skill per hero while paused. A new order replaces that hero’s previous order. MP is spent only when the action executes after resuming. Skills are separated by 0.65 seconds. Selecting a queued skill again cancels it.</p><h3>Read enemy intentions</h3><p>An amber enemy card signals an incoming attack. Fracture and Frost Shard interrupt it. The Warden can strike the entire party.</p><h3>Survive</h3><p>Each victory restores 18 HP and 10 MP. The spring fully restores the party once. Retreat returns you to the entrance with your current health. After defeat, you can resume the last saved checkpoint.</p><p class="fine">Music and sound effects can be adjusted in the menu.</p></div>`);}
-function openMenu(){showDialog('Expedition',`<div class="menu-stack"><p class="dialog-intro">${objective(game)}</p><p class="expedition-stats">${game.gold} shards · ${game.cleared.size} / ${ENCOUNTERS.length} encounters cleared</p><div class="sound-settings"><label class="sound-toggle">Mute all sound<input id="mute-setting" type="checkbox" ${audio.settings.muted?'checked':''}></label><label class="sound-slider">Music<input id="music-setting" type="range" min="0" max="100" value="${Math.round(audio.settings.music*100)}"></label><label class="sound-slider">Sound effects<input id="effects-setting" type="range" min="0" max="100" value="${Math.round(audio.settings.effects*100)}"></label></div><button class="secondary" data-menu="help">Field guide</button>${game.phase==='combat'?'<button class="secondary" data-menu="ask-retreat">Retreat to the entrance</button>':''}<button class="secondary" data-menu="export">Export save</button><button class="secondary" data-menu="import">Import save</button><button class="secondary" data-menu="install" id="install-button" hidden>Install game</button><button class="secondary" data-menu="update" id="update-button" hidden>Apply update</button><button class="danger-button" data-menu="new">New expedition</button><span class="fine">${GAME_TITLE} · Prototype 0.4</span></div>`);if(installPrompt)$('install-button').hidden=false;if(waitingWorker)$('update-button').hidden=false;}
+function openHelp(){showDialog('Field guide',`<div class="guide"><h3>Explore</h3><p>Move one tile at a time and turn through 90°. Creatures are visible in the corridors. Combat begins when one is directly in front of you.</p><p><b>Keyboard:</b> W / Z or ↑ to move forward, S or ↓ to move backward, ← / → to turn, A / Q and D to step sideways. E to interact, M for the map. All actions also have touch controls.</p><h3>Fight</h3><p>Kael and Lys attack automatically. Use the three skills with their buttons or keys <b>1, 2 and 3</b>. Each opponent fights at full size. Reinforcements arrive one at a time; the counter shows your progress through the encounter.</p><p><b>Space pauses combat.</b> Queue one skill per hero while paused. A new order replaces that hero’s previous order. MP is spent only when the action executes after resuming. Skills are separated by 0.65 seconds. Selecting a queued skill again cancels it.</p><h3>Read enemy intentions</h3><p>An amber enemy card signals an incoming attack. Fracture and Frost Shard interrupt it. The Warden can strike the entire party.</p><h3>Survive</h3><p>Each victory restores 18 HP and 10 MP. The spring fully restores the party once. Retreat returns you to the entrance with your current health. After defeat, you can resume the last saved checkpoint.</p><p class="fine">Music and sound effects can be adjusted in the menu.</p></div>`);}
+function openMenu(){showDialog('Expedition',`<div class="menu-stack"><p class="dialog-intro">${objective(game)}</p><p class="expedition-stats">${game.gold} shards · ${game.cleared.size} / ${ENCOUNTERS.length} encounters cleared</p><div class="sound-settings"><label class="sound-toggle">Mute all sound<input id="mute-setting" type="checkbox" ${audio.settings.muted?'checked':''}></label><label class="sound-slider">Music<input id="music-setting" type="range" min="0" max="100" value="${Math.round(audio.settings.music*100)}"></label><label class="sound-slider">Sound effects<input id="effects-setting" type="range" min="0" max="100" value="${Math.round(audio.settings.effects*100)}"></label></div><button class="secondary" data-menu="help">Field guide</button>${game.phase==='combat'?'<button class="secondary" data-menu="ask-retreat">Retreat to the entrance</button>':''}<button class="secondary" data-menu="export">Export save</button><button class="secondary" data-menu="import">Import save</button><button class="secondary" data-menu="install" id="install-button" hidden>Install game</button><button class="secondary" data-menu="update" id="update-button" hidden>Apply update</button><button class="danger-button" data-menu="new">New expedition</button><span class="fine">${GAME_TITLE} · Prototype 0.5</span></div>`);if(installPrompt)$('install-button').hidden=false;if(waitingWorker)$('update-button').hidden=false;}
 
 app.addEventListener('click',event=>{
   const button=(event.target as Element).closest<HTMLButtonElement>('button');if(!button||button.disabled)return;
@@ -206,7 +212,7 @@ document.addEventListener('keydown',event=>{
   if(key===' '){togglePause(game);ui();return;}
   if(key==='m'){openMap();return;}
   if(['1','2','3'].includes(key)){useSkill(game,(['fracture','frost','heal']as Skill[])[Number(key)-1]);ui();return;}
-  if(key==='tab'&&game.phase==='combat'){const living=game.battle!.enemies.filter(e=>e.hp>0);const index=living.findIndex(e=>e.id===livingTarget(game)?.id);selectTarget(game,living[(index+1)%living.length].id);ui();return;}
+  if(key==='tab'&&game.phase==='combat'){const target=livingTarget(game);if(target)selectTarget(game,target.id);ui();return;}
   const actions:Record<string,string>={arrowup:'forward',z:'forward',w:'forward',arrowdown:'back',s:'back',arrowleft:'turnLeft',arrowright:'turnRight',q:'left',a:'left',d:'right',e:'interact'};
   if(actions[key]){event.preventDefault();act(actions[key]);}
 });
