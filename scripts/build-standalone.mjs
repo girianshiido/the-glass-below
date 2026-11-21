@@ -6,8 +6,8 @@ const cssPath=html.match(/<link[^>]+href="([^"]+\.css)"[^>]*>/)?.[1];
 if(!jsPath||!cssPath)throw new Error('Built entry points not found');
 let js=await readFile(new URL(jsPath,dist),'utf8');
 let css=await readFile(new URL(cssPath,dist),'utf8');
-for(const path of ['art/bestiary.png','art/impacts.png',...(await readdir(new URL('audio/',dist))).filter(f=>/\.(ogg|m4a)$/.test(f)).map(f=>'audio/'+f)]){
-  const mime=path.endsWith('.png')?'image/png':path.endsWith('.ogg')?'audio/ogg':'audio/mp4';
+for(const path of ['art/bestiary.png','art/impacts.png','art/residents.webp','art/heroes.webp','art/surfaces.webp',...(await readdir(new URL('audio/',dist))).filter(f=>/\.(ogg|m4a)$/.test(f)).map(f=>'audio/'+f)]){
+  const mime=path.endsWith('.png')?'image/png':path.endsWith('.webp')?'image/webp':path.endsWith('.ogg')?'audio/ogg':'audio/mp4';
   const data=`data:${mime};base64,`+(await readFile(new URL(path,dist))).toString('base64');
   js=js.replaceAll('./'+path,data);
 }

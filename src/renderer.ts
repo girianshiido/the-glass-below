@@ -1,4 +1,7 @@
-import {ROAD_ENCOUNTERS} from './campaign.ts';
+import {regionGeometry,COLORS,box as regionBox,quad as regionQuad} from './region-geometry.ts';
+import type {Material} from './region-geometry.ts';
+import {regionOf,REGION_WORLDS} from './region-world.ts';
+import type {Zone} from './campaign.ts';
 import {makeStone,makeFlame} from './stone-art.ts';
 import {MAP,WIDTH,HEIGHT,wall,ENCOUNTERS,CHEST,SHRINE,GATE,EXIT,same} from './world.ts';
 import {CREATURES,visibleEnemy,encounterActive,encounterDefinition} from './engine.ts';
@@ -10,18 +13,18 @@ const CELL=2.6,TOP=3.05;
 type Vec=[number,number,number];
 const VERTEX=`attribute vec3 aPosition;attribute vec3 aNormal;attribute vec2 aUv;uniform mat4 uProjection;uniform mat4 uView;varying vec3 vWorld;varying vec3 vNormal;varying vec2 vUv;void main(){vWorld=aPosition;vNormal=aNormal;vUv=aUv;gl_Position=uProjection*uView*vec4(aPosition,1.);}`;
 const FRAGMENT=`precision mediump float;varying vec3 vWorld;varying vec3 vNormal;varying vec2 vUv;
-uniform sampler2D uTexture;uniform vec3 uEye;uniform vec3 uTint;uniform float uMode;uniform float uAlpha;uniform vec3 uTorches[6];uniform float uTime;
-void main(){vec4 tex=texture2D(uTexture,vUv);if(tex.a<.12)discard;float d=distance(vWorld,uEye);vec3 light=vec3(.20,.29,.33);vec3 sheen=vec3(0.);
+uniform sampler2D uTexture;uniform vec3 uEye;uniform vec3 uTint;uniform float uMode;uniform float uAlpha;uniform vec3 uTorches[6];uniform float uTime;uniform float uOutside;uniform vec3 uFogColor;uniform float uFogDensity;
+void main(){vec4 tex=texture2D(uTexture,vUv);if(tex.a<.12)discard;float d=distance(vWorld,uEye);vec3 light=mix(vec3(.42,.48,.49),vec3(.8,.86,.9),uOutside);vec3 sheen=vec3(0.);
 if(uMode<.5){vec3 n=normalize(vNormal+vec3(sin(vWorld.z*41.)*.045,0.,sin(vWorld.x*37.)*.045));vec3 eye=normalize(uEye-vWorld);
- light+=vec3(.12,.16,.18)*max(0.,dot(n,normalize(vec3(.3,.8,.4))));
- for(int i=0;i<6;i++){vec3 delta=uTorches[i]-vWorld;float t=length(delta);vec3 l=normalize(delta);float flicker=.93+.07*sin(uTime*7.+float(i)*2.)*sin(uTime*11.3+float(i));float power=4.5*flicker/(1.+t*t*.7);
+ light+=vec3(.28,.27,.21)*max(0.,dot(n,normalize(vec3(.3,.8,.4))));
+ for(int i=0;i<6;i++){vec3 delta=uTorches[i]-vWorld;float t=length(delta);vec3 l=normalize(delta);float flicker=.93+.07*sin(uTime*7.+float(i)*2.)*sin(uTime*11.3+float(i));float power=4.5*flicker*(1.-uOutside)/(1.+t*t*.7);
  light+=vec3(1.,.56,.23)*power*(.25+.75*max(0.,dot(n,l)));
  float spec=pow(max(0.,dot(n,normalize(l+eye))),40.);sheen+=vec3(.6,.34,.12)*spec*power*max(0.,n.y)*.35;}
  float lantern=distance(vWorld,uEye+vec3(0.,-.4,0.));light+=vec3(.55,.64,.61)*2.3/(1.+lantern*lantern*.55);
  float base=clamp(vWorld.y/.24,0.,1.);if(abs(n.y)<.5)light*=.62+.38*base;
 }else if(uMode<1.5){light=vec3(.82,.86,.83);}else{light=vec3(1.);}
-vec3 color=tex.rgb*light*uTint+sheen;float fog=1.-exp(-d*d*.0037);color=mix(color,vec3(.018,.043,.055),min(.97,fog));gl_FragColor=vec4(color,tex.a*uAlpha);}`;
-function projection(aspect:number,shiftY=0){const f=1/Math.tan(VERTICAL_FOV/2),n=.06,far=48;return new Float32Array([f/aspect,0,0,0,0,f,0,0,0,shiftY,(far+n)/(n-far),-1,0,0,2*far*n/(n-far),0]);}
+vec3 color=tex.rgb*light*uTint+sheen;float fog=1.-exp(-d*d*uFogDensity);color=mix(color,uFogColor,min(.99,fog));gl_FragColor=vec4(color,tex.a*uAlpha);}`;
+function projection(aspect:number,shiftY=0){const f=1/Math.tan(VERTICAL_FOV/2),n=.06,far=220;return new Float32Array([f/aspect,0,0,0,0,f,0,0,0,shiftY,(far+n)/(n-far),-1,0,0,2*far*n/(n-far),0]);}
 function view(eye:Vec,yaw:number){const c=Math.cos(yaw),s=Math.sin(yaw);return new Float32Array([-s,0,-c,0,0,1,0,0,c,0,-s,0,s*eye[0]-c*eye[2],-eye[1],c*eye[0]+s*eye[2],1]);}
 function quad(out:number[],a:Vec,b:Vec,c:Vec,d:Vec,n:Vec,uv=[0,0,1,1]){
   const[u0,v0,u1,v1]=uv;
@@ -39,9 +42,14 @@ export class DungeonRenderer {
   private positions:number;private normals:number;private uvs:number;
   private uniforms:Record<string,WebGLUniformLocation|null>={};
   private walls:Mesh;private floor:Mesh;private ceiling:Mesh;
-  private dynamic:Mesh;private ornament:Mesh;private forestGround:Mesh;private forestPath:Mesh;private forestTrunks:Mesh;private forestLeaves:Mesh;private grass:WebGLTexture;private gravel:WebGLTexture;
+  private dynamic:Mesh;private ornament:Mesh;
   private wallTexture:WebGLTexture;private floorTexture:WebGLTexture;private white:WebGLTexture;private glow:WebGLTexture;private flame:WebGLTexture;
   private atlas:WebGLTexture|null=null;
+  private residents:WebGLTexture|null=null;
+  private sky:WebGLTexture;
+  private regions=new Map<Zone,{material:Material;mesh:Mesh}[]>();
+  private signs=new Map<string,WebGLTexture>();
+  private materials=new Map<Material,WebGLTexture>();
   private torches:Vec[]=[[2,1.72,.76],[.76,1.72,5],[8,1.72,4.76],[10,1.72,.76],[16,1.72,4.76],[17.24,1.72,11]].map(([x,y,z])=>[x*CELL,y,z*CELL]);
   public ready:Promise<void>;
   public error='';
@@ -53,8 +61,9 @@ export class DungeonRenderer {
     const shader=(type:number,source:string)=>{const s=gl.createShader(type)!;gl.shaderSource(s,source);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(s)??'Shader');return s;};
     this.program=gl.createProgram()!;gl.attachShader(this.program,shader(gl.VERTEX_SHADER,VERTEX));gl.attachShader(this.program,shader(gl.FRAGMENT_SHADER,FRAGMENT));gl.linkProgram(this.program);if(!gl.getProgramParameter(this.program,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(this.program)??'WebGL');gl.useProgram(this.program);
     this.positions=gl.getAttribLocation(this.program,'aPosition');this.normals=gl.getAttribLocation(this.program,'aNormal');this.uvs=gl.getAttribLocation(this.program,'aUv');
-    for(const name of ['uProjection','uView','uEye','uTint','uMode','uAlpha','uTorches[0]','uTime'])this.uniforms[name]=gl.getUniformLocation(this.program,name);
+    for(const name of ['uProjection','uView','uEye','uTint','uMode','uAlpha','uTorches[0]','uTime','uOutside','uFogColor','uFogDensity'])this.uniforms[name]=gl.getUniformLocation(this.program,name);
     gl.enable(gl.DEPTH_TEST);gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.clearColor(.025,.065,.075,1);
+    const sky=document.createElement('canvas');sky.width=512;sky.height=256;const sc=sky.getContext('2d')!,sg=sc.createLinearGradient(0,0,0,256);sg.addColorStop(0,'#183044');sg.addColorStop(.46,'#4d6878');sg.addColorStop(.8,'#a7ada0');sg.addColorStop(1,'#9eaa94');sc.fillStyle=sg;sc.fillRect(0,0,512,256);for(let k=0;k<34;k++){sc.fillStyle='#d7c6a50b';sc.beginPath();sc.ellipse((k*107)%512,80+(k*31)%65,42+(k*29)%80,1+k%4,0,0,Math.PI*2);sc.fill();}this.sky=this.texture(sky);
     this.wallTexture=this.texture(makeStone());this.floorTexture=this.texture(makeStone(true));
     const white=document.createElement('canvas');white.width=white.height=2;white.getContext('2d')!.fillStyle='#ffffff';white.getContext('2d')!.fillRect(0,0,2,2);this.white=this.texture(white);
     const glow=document.createElement('canvas');glow.width=glow.height=128;const ctx=glow.getContext('2d')!,gr=ctx.createRadialGradient(64,64,0,64,64,64);gr.addColorStop(0,'#fff6cf');gr.addColorStop(.13,'#ffc980');gr.addColorStop(.4,'#f58f4144');gr.addColorStop(1,'#f58f4100');ctx.fillStyle=gr;ctx.fillRect(0,0,128,128);this.glow=this.texture(glow);this.flame=this.texture(makeFlame());
@@ -94,20 +103,15 @@ export class DungeonRenderer {
       }
     }
     this.ornament=this.mesh(ornament);this.walls=this.mesh(walls);this.floor=this.mesh(floor);this.ceiling=this.mesh(ceiling);this.dynamic=this.mesh([]);
-    const ground:number[]=[],path:number[]=[],trunks:number[]=[],leaves:number[]=[];
-    for(let x=-4;x<16;x++)for(let z=-5;z<8;z++)quad(z===1?path:ground,[x*CELL,0,(z-.5)*CELL],[(x+1)*CELL,0,(z-.5)*CELL],[(x+1)*CELL,0,(z+.5)*CELL],[x*CELL,0,(z+.5)*CELL],[0,1,0]);
-    for(let x=-2;x<15;x++)for(const side of [-1,1])for(let row=0;row<3;row++){
-      const tx=x*CELL+.7*Math.sin(x*13+row),tz=CELL+side*(2.7+row*3.1),height=4.5+Math.sin(x*9+row)*1.3;
-      box(trunks,tx,0,tz,.26,height,.28);
-      for(let layer=0;layer<3;layer++){const base=1.2+layer*.95,radius=1.6-layer*.3;for(let k=0;k<8;k++){const a=k*Math.PI/4,b=(k+1)*Math.PI/4;quad(leaves,[tx+Math.cos(a)*radius,base,tz+Math.sin(a)*radius],[tx+Math.cos(b)*radius,base,tz+Math.sin(b)*radius],[tx,base+height*.65,tz],[tx,base+height*.65,tz],[Math.cos(a),.6,Math.sin(a)]);}}
-    }
-    const terrain=(road:boolean)=>{const c=document.createElement('canvas');c.width=c.height=256;const ctx=c.getContext('2d')!;ctx.fillStyle=road?'#394043':'#203b32';ctx.fillRect(0,0,256,256);let seed=road?123:321;for(let i=0;i<4500;i++){seed=(seed*1664525+1013904223)>>>0;const a=seed%256;seed=(seed*1664525+1013904223)>>>0;const b=seed%256;ctx.fillStyle=i%3===0?'#b7b99525':'#061d212e';ctx.fillRect(a,b,road?3+i%8:1,road?2:5+i%9);}return c;};
-    this.grass=this.texture(terrain(false));this.gravel=this.texture(terrain(true));this.forestGround=this.mesh(ground);this.forestPath=this.mesh(path);this.forestTrunks=this.mesh(trunks);this.forestLeaves=this.mesh(leaves);
-    this.ready=this.loadAtlas().catch(error=>{this.error=String(error);throw error;});
+    for(const zone of Object.keys(REGION_WORLDS)as Zone[])this.regions.set(zone,Object.entries(regionGeometry(zone)).filter(([,v])=>v.length).sort(([a],[b])=>a==='shadow'?1:b==='shadow'?-1:0).map(([material,v])=>({material:material as Material,mesh:this.mesh(v)})));
+    for(const material of ['wood','roof','plaster','grass','path','leaf','cobble']as Material[]){const c=document.createElement('canvas');c.width=c.height=256;const cx=c.getContext('2d')!;cx.fillStyle='#d2cbb9';cx.fillRect(0,0,256,256);let seed=713;for(let i=0;i<3500;i++){seed=(seed*1664525+1013904223)>>>0;const x=seed%256;seed=(seed*1664525+1013904223)>>>0;const y=seed%256;cx.fillStyle=i%2?'#20281b19':'#ffffff23';cx.fillRect(x,y,material==='wood'?1:3,material==='wood'?22:material==='grass'?8:2);}if(material==='roof'||material==='wood'){cx.strokeStyle='#182b2e55';cx.lineWidth=2;for(let y=0;y<256;y+=32){cx.beginPath();cx.moveTo(0,y);cx.lineTo(256,y);cx.stroke();if(material==='roof')for(let x=0;x<256;x+=48){cx.beginPath();cx.moveTo(x+(y%64?24:0),y);cx.lineTo(x+(y%64?24:0),y+32);cx.stroke();}}}if(material==='cobble'){cx.fillStyle='#3f514e';cx.fillRect(0,0,256,256);for(let row=0;row<10;row++)for(let col=-1;col<10;col++){const x=col*30+(row%2)*15,y=row*26;cx.fillStyle=['#9a9b88','#888f81','#a4a28b','#798a80'][(col+row*3+20)%4];cx.beginPath();cx.roundRect(x+1,y+1,27,23,4);cx.fill();cx.strokeStyle='#c5c4a63a';cx.stroke();}}this.materials.set(material,this.texture(c));}
+    this.ready=Promise.all([this.loadAtlas(),this.loadResidents(),this.loadSurfaces()]).then(()=>{}).catch(error=>{this.error=String(error);throw error;});
     canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();this.error='The graphics context was lost. Reload to resume your saved expedition.';});
   }
+  private async loadSurfaces(){const img=new Image();img.src='./art/surfaces.webp';await img.decode();for(const[material,col,row]of [['path',0,0],['wood',1,0],['plaster',0,1],['roof',1,1]]as [Material,number,number][]){const c=document.createElement('canvas');c.width=c.height=512;c.getContext('2d')!.drawImage(img,col*img.width/2,row*img.height/2,img.width/2,img.height/2,0,0,512,512);this.materials.set(material,this.texture(c,true));}}
+  private async loadResidents(){const img=new Image();img.src='./art/residents.webp';await img.decode();this.residents=this.texture(img);}
   private async loadAtlas(){const img=new Image();img.src='./art/bestiary.png';await img.decode();this.atlas=this.texture(img);}
-  private texture(image:TexImageSource){const gl=this.gl,t=gl.createTexture()!;gl.bindTexture(gl.TEXTURE_2D,t);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,1);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,image);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);return t;}
+  private texture(image:TexImageSource,repeat=false){const gl=this.gl,t=gl.createTexture()!;gl.bindTexture(gl.TEXTURE_2D,t);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,1);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,image);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,repeat?gl.REPEAT:gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,repeat?gl.REPEAT:gl.CLAMP_TO_EDGE);return t;}
   private mesh(vertices:number[]):Mesh{const buffer=this.gl.createBuffer()!;this.gl.bindBuffer(this.gl.ARRAY_BUFFER,buffer);this.gl.bufferData(this.gl.ARRAY_BUFFER,new Float32Array(vertices),this.gl.STATIC_DRAW);return{buffer,count:vertices.length/8};}
   private draw(mesh:Mesh,texture:WebGLTexture,tint:Vec=[1,1,1],mode=0,alpha=1){
     const gl=this.gl;gl.bindBuffer(gl.ARRAY_BUFFER,mesh.buffer);
@@ -117,6 +121,7 @@ export class DungeonRenderer {
   private transient(vertices:number[],texture:WebGLTexture,tint:Vec,mode=0,alpha=1){const gl=this.gl;gl.bindBuffer(gl.ARRAY_BUFFER,this.dynamic.buffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(vertices),gl.DYNAMIC_DRAW);this.dynamic.count=vertices.length/8;this.draw(this.dynamic,texture,tint,mode,alpha);}
   private billboard(x:number,z:number,w:number,h:number,yaw:number,uv:number[],ground=0){const s=Math.sin(yaw)*w/2,c=Math.cos(yaw)*w/2,a:Vec=[x+s,ground,z-c],b:Vec=[x-s,ground,z+c],out:number[]=[];quad(out,a,b,[b[0],h+ground,b[2]],[a[0],h+ground,a[2]],[0,0,1],uv);return out;}
   render(g:Game,camera:Camera,time:number){
+    if(g.campaign){this.renderRegion(g,camera,time);return;}
     const gl=this.gl,dpr=Math.min(devicePixelRatio||1,1.6),w=Math.round(this.canvas.clientWidth*dpr),h=Math.round(this.canvas.clientHeight*dpr);
     if(this.canvas.width!==w||this.canvas.height!==h){this.canvas.width=w;this.canvas.height=h;}if(w===0||h===0)return;
     gl.viewport(0,0,w,h);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.useProgram(this.program);
@@ -128,8 +133,7 @@ export class DungeonRenderer {
     const advance=battle?Math.max(0,...battle.enemies.map(e=>{const age=battle.time-e.strikeAt;return age>=0&&age<.3?Math.sin(age/.3*Math.PI)*.22:0;})):0;
     const depth=battleEncounter?Math.max(.7,(battleEncounter.x*CELL-eye[0])*Math.cos(camera.yaw)+(battleEncounter.y*CELL-eye[2])*Math.sin(camera.yaw)-advance):0;
     const framing=battleEncounter&&battle?creatureLayout(battleEncounter.kind,this.canvas.clientWidth,this.canvas.clientHeight,depth,this.combatInsets):undefined;
-    gl.uniformMatrix4fv(this.uniforms.uProjection,false,projection(w/h,framing?.shiftY??0));gl.uniformMatrix4fv(this.uniforms.uView,false,view(eye,camera.yaw+shake*.3));gl.uniform3fv(this.uniforms.uEye,eye);gl.uniform3fv(this.uniforms['uTorches[0]'],this.torches.flat());gl.uniform1f(this.uniforms.uTime,clock);
-    if(g.campaign?.zone==='road'){this.renderRoad(g,camera,clock,framing?.scale??1);return;}
+    gl.uniformMatrix4fv(this.uniforms.uProjection,false,projection(w/h,framing?.shiftY??0));gl.uniformMatrix4fv(this.uniforms.uView,false,view(eye,camera.yaw+shake*.3));gl.uniform3fv(this.uniforms.uEye,eye);gl.uniform3fv(this.uniforms['uTorches[0]'],this.torches.flat());gl.uniform1f(this.uniforms.uTime,clock);gl.uniform1f(this.uniforms.uOutside,0);gl.uniform3fv(this.uniforms.uFogColor,[.018,.043,.055]);gl.uniform1f(this.uniforms.uFogDensity,.0037);
     gl.depthMask(true);this.draw(this.floor,this.floorTexture,[.8,.9,.88]);this.draw(this.ceiling,this.wallTexture,[.52,.62,.67]);this.draw(this.walls,this.wallTexture);this.draw(this.ornament,this.white,[.24,.39,.37]);
     const props:number[]=[];
     // Closed iron gate physically occludes the far corridor and its monsters.
@@ -161,7 +165,7 @@ export class DungeonRenderer {
     }
     if(!g.shrineUsed)this.transient(this.billboard(SHRINE.x*CELL,SHRINE.y*CELL,1.1,1.6,camera.yaw,[0,0,1,1],.08),this.glow,[.3,1,1],2,.7);
     const sprites:{x:number;y:number;kind:keyof typeof CREATURES;enemy?:Enemy;distance:number;scale:number}[]=[];
-    for(const encounter of (g.campaign?.zone==='glassworks'&&battleEncounter?[battleEncounter]:ENCOUNTERS)){
+    for(const encounter of ENCOUNTERS){
       const active=battle?.encounter===encounter.id&&(g.phase==='combat'||g.phase==='victory');if(!encounterActive(g,encounter.id)&&!active)continue;
       const layout=active&&framing?framing:creatureLayout(encounter.kind,this.canvas.clientWidth,this.canvas.clientHeight,Math.hypot(encounter.x-camera.x,encounter.y-camera.y)*CELL,{top:0,bottom:0});
       const enemy=active?visibleEnemy(battle!):undefined;if(enemy&&enemy.hp<=0&&battle!.time-enemy.deathAt>.65&&g.phase!=='victory')continue;
@@ -181,29 +185,58 @@ export class DungeonRenderer {
     }
     gl.depthMask(true);
   }
-  private renderRoad(g:Game,camera:Camera,clock:number,scale:number){
-    const gl=this.gl;gl.clearColor(.065,.12,.16,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.depthMask(true);
-    this.draw(this.forestGround,this.grass,[.7,.9,.8]);this.draw(this.forestPath,this.gravel,[.85,.83,.73]);this.draw(this.forestTrunks,this.wallTexture,[.6,.5,.4]);this.draw(this.forestLeaves,this.grass,[.55,.85,.7],1);gl.depthMask(false);
-    if(this.atlas)for(const encounter of [...ROAD_ENCOUNTERS].reverse()){
-      const active=g.battle?.encounter===encounter.id;if(!encounterActive(g,encounter.id)||g.phase==='victory'&&active)continue;
-      const e=active?visibleEnemy(g.battle!):undefined;let pose=Math.floor(clock*1.7)%2;if(e){if(e.hp<=0||g.battle!.time-e.hurtAt<.24)pose=4;else if(g.battle!.time-e.strikeAt<.32)pose=3;else if(e.windup>0)pose=2;}
-      const f=creatureFrame(encounter.kind,pose),factor=active?scale:1;
-      this.transient(this.billboard(encounter.x*CELL,encounter.y*CELL,f.width*factor,f.height*factor,camera.yaw,f.uv),this.atlas,e&&e.stunned>0&&e.frozen?[.56,.94,1]:[1,1,1],1);
-    }gl.depthMask(true);gl.clearColor(.025,.065,.075,1);
+  private sign(label:string,x:number,z:number,y:number,yaw:number,width=2.4){
+    let texture=this.signs.get(label);if(!texture){const c=document.createElement('canvas');c.width=512;c.height=128;const ctx=c.getContext('2d')!;ctx.fillStyle='#172c31';ctx.fillRect(0,0,512,128);ctx.strokeStyle='#b8a779';ctx.lineWidth=5;ctx.strokeRect(8,8,496,112);ctx.fillStyle='#f2dbac';ctx.font='bold 33px Georgia';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(label,256,67,470);texture=this.texture(c);this.signs.set(label,texture);}this.transient(this.billboard(x,z,width,width/4,yaw,[0,0,1,1],y),texture,[1,1,1],1);
+  }
+  private renderRegion(g:Game,camera:Camera,time:number){
+    const gl=this.gl,w=Math.round(this.canvas.clientWidth*Math.min(devicePixelRatio||1,1.6)),h=Math.round(this.canvas.clientHeight*Math.min(devicePixelRatio||1,1.6));if(this.canvas.width!==w||this.canvas.height!==h){this.canvas.width=w;this.canvas.height=h;}if(!w||!h)return;
+    const region=regionOf(g),battle=g.battle,clock=g.phase==='combat'?battle!.time:time,eye:Vec=[camera.x*CELL,CAMERA_HEIGHT,camera.y*CELL],outdoor=region.outdoor;
+    const fog:Vec=outdoor?[.38,.49,.54]:region.zone==='glassworks'?[.08,.14,.17]:[.025,.065,.08];gl.clearColor(...fog,1);gl.viewport(0,0,w,h);gl.depthMask(true);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.useProgram(this.program);
+    const encounter=battle?encounterDefinition(battle.encounter):undefined;
+    const advance=battle?Math.max(0,...battle.enemies.map(e=>{const age=battle.time-e.strikeAt;return age>=0&&age<.3?Math.sin(age/.3*Math.PI)*.22:0;})):0;
+    const depth=encounter?Math.max(.7,(encounter.x*CELL-eye[0])*Math.cos(camera.yaw)+(encounter.y*CELL-eye[2])*Math.sin(camera.yaw)-advance):0;
+    const framing=encounter&&battle?creatureLayout(encounter.kind,this.canvas.clientWidth,this.canvas.clientHeight,depth,this.combatInsets):undefined;
+    gl.uniformMatrix4fv(this.uniforms.uProjection,false,projection(w/h,framing?.shiftY??0));gl.uniformMatrix4fv(this.uniforms.uView,false,view(eye,camera.yaw));gl.uniform3fv(this.uniforms.uEye,eye);gl.uniform3fv(this.uniforms['uTorches[0]'],this.torches.flat());gl.uniform1f(this.uniforms.uTime,clock);gl.uniform1f(this.uniforms.uOutside,outdoor?1:0);gl.uniform3fv(this.uniforms.uFogColor,fog);gl.uniform1f(this.uniforms.uFogDensity,outdoor?.000075:.00024);
+    if(outdoor){const skybox:number[]=[],cx=region.map[0].length*CELL/2,cz=region.map.length*CELL/2,r=145;regionQuad(skybox,[cx-r,-30,cz-r],[cx+r,-30,cz-r],[cx+r,100,cz-r],[cx-r,100,cz-r],[0,0,1]);regionQuad(skybox,[cx+r,-30,cz+r],[cx-r,-30,cz+r],[cx-r,100,cz+r],[cx+r,100,cz+r],[0,0,-1]);regionQuad(skybox,[cx-r,-30,cz+r],[cx-r,-30,cz-r],[cx-r,100,cz-r],[cx-r,100,cz+r],[1,0,0]);regionQuad(skybox,[cx+r,-30,cz-r],[cx+r,-30,cz+r],[cx+r,100,cz+r],[cx+r,100,cz-r],[-1,0,0]);regionQuad(skybox,[cx-r,100,cz-r],[cx+r,100,cz-r],[cx+r,100,cz+r],[cx-r,100,cz+r],[0,-1,0],[0,1,1,1]);gl.depthMask(false);gl.uniform1f(this.uniforms.uFogDensity,0);this.transient(skybox,this.sky,[1,1,1],2);gl.uniform1f(this.uniforms.uFogDensity,.000075);gl.depthMask(true);}
+    for(const {material,mesh}of this.regions.get(region.zone)!){const tex=this.materials.get(material)??(material==='stone'?this.wallTexture:material==='floor'?this.floorTexture:this.white);if(material==='shadow')gl.depthMask(false);this.draw(mesh,tex,COLORS[material],['glass','water','shadow'].includes(material)?2:0,material==='shadow'?.25:1);gl.depthMask(true);}
+    const props:number[]=[];
+    if(region.zone==='village'){
+      const amount=g.campaign!.villageGateOpen?Math.min(1,Math.max(0,(g.playTime-(g.campaign!.gateOpenedAt??-2))/.9)):0;
+      for(const side of [-1,1]){const hinge=10*CELL+side*CELL/2,angle=amount*Math.PI*.48;for(let bar=0;bar<=6;bar++){const d=bar*CELL/12;regionBox(props,24*CELL-Math.sin(angle)*d,0,hinge-side*Math.cos(angle)*d,.07,2.7,.07);}for(const y of [.5,1.5,2.6]){const d=CELL/4,x=24*CELL-Math.sin(angle)*d,z=hinge-side*Math.cos(angle)*d;const a:Vec=[x+Math.sin(angle)*CELL/4,y,z+side*Math.cos(angle)*CELL/4],b:Vec=[x-Math.sin(angle)*CELL/4,y,z-side*Math.cos(angle)*CELL/4];regionQuad(props,a,b,[b[0],y+.08,b[2]],[a[0],y+.08,a[2]],[1,0,0]);}}
+      this.transient(props,this.white,[.24,.23,.17]);this.sign('OLD PINE ROAD',24*CELL-.3,10*CELL,3.7,0,3.3);this.sign('LANTERN & THORN',5*CELL,10*CELL-.45,2.65,-Math.PI/2,3.4);this.sign('PROVISIONS',19*CELL,13*CELL-.45,2.65,-Math.PI/2,3);
+    }
+    if(region.zone==='road'){this.sign('GREYHAVEN',-.1,10*CELL,2.6,Math.PI,2.6);this.sign('THE GLASSWORKS',24*CELL-.1,6*CELL,3.3,0,3.4);}
+    if(region.zone==='glassworks'){this.sign('CRYPT STAIRS',19*CELL,1.25,2.4,-Math.PI/2,3);this.sign('OLD PINE ROAD',11*CELL,18*CELL-.3,3.4,Math.PI/2,3.2);}
+    if(region.zone==='crypts'){
+      if(!g.gateOpen){for(let k=-4;k<=4;k++)regionBox(props,17*CELL+k*.27,0,9*CELL,.075,4.2,.12);regionBox(props,17*CELL,2,9*CELL,2.6,.1,.14);}
+      if(!g.chestOpen){regionBox(props,5*CELL,.02,3*CELL,.8,.5,.6);regionBox(props,5*CELL,.52,3*CELL,.85,.1,.65);}this.transient(props,this.white,[.53,.39,.21]);
+      this.sign('GLASSWORKS ↑',1*CELL,1*CELL,2.4,Math.PI,2.3);this.sign('GLASSWORKS ↑',17*CELL,13*CELL,2.5,Math.PI/2,2.4);
+      const spring:number[]=[];regionBox(spring,1*CELL,.02,7*CELL,.7,.22,.7);this.transient(spring,this.white,g.shrineUsed?[.2,.4,.4]:[.3,.9,.9],2);
+    }
+    // Opaque world geometry writes depth first; alpha cutout characters then occlude correctly.
+    const sprites:{x:number;y:number;kind?:keyof typeof CREATURES;enemy?:Enemy;frame?:number;scale:number}[]=[];
+    for(const e of region.encounters){const active=battle?.encounter===e.id;if(!encounterActive(g,e.id)||g.phase==='victory'&&active)continue;sprites.push({...e,enemy:active?visibleEnemy(battle!):undefined,scale:active?framing?.scale??1:1});}
+    for(const n of region.residents)if(!(n.id==='lys'&&g.campaign!.recruited))sprites.push({...n,scale:1});
+    sprites.sort((a,b)=>Math.hypot(b.x-camera.x,b.y-camera.y)-Math.hypot(a.x-camera.x,a.y-camera.y));
+    for(const s of sprites){if(s.frame!==undefined){if(this.residents)this.transient(this.billboard(s.x*CELL,s.y*CELL,.82,1.9,camera.yaw,[s.frame/4,0,(s.frame+1)/4,1]),this.residents,[1,1,1],1);continue;}if(!this.atlas||!s.kind)continue;
+      const e=s.enemy;let pose=Math.floor(clock*1.7)%2;if(e){if(e.hp<=0||battle!.time-e.hurtAt<.24)pose=4;else if(battle!.time-e.strikeAt<.32)pose=3;else if(e.windup>0)pose=2;}const f=creatureFrame(s.kind,pose),attack=e&&battle!.time-e.strikeAt<.3?Math.sin((battle!.time-e.strikeAt)/.3*Math.PI)*.22:0;this.transient(this.billboard(s.x*CELL-Math.cos(camera.yaw)*attack,s.y*CELL-Math.sin(camera.yaw)*attack,f.width*s.scale,f.height*s.scale,camera.yaw,f.uv),this.atlas,e&&e.frozen&&e.stunned>0?[.56,.94,1]:e&&battle!.time-e.hurtAt<.18?[1.4,.74,.65]:[1,1,1],1);
+    }
+    gl.depthMask(true);
   }
 
 }
 export function drawMap(canvas:HTMLCanvasElement,g:Game,full=false){
   const ctx=canvas.getContext('2d')!,dpr=Math.min(devicePixelRatio||1,2),width=canvas.clientWidth,height=canvas.clientHeight;
   canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);ctx.scale(dpr,dpr);ctx.clearRect(0,0,width,height);
-  const size=full?Math.min((width-24)/WIDTH,(height-24)/HEIGHT):Math.min(width/9,height/9);
-  const ox=full?(width-WIDTH*size)/2:width/2-(g.position.x+.5)*size,oy=full?(height-HEIGHT*size)/2:height/2-(g.position.y+.5)*size;
-  for(let y=0;y<HEIGHT;y++)for(let x=0;x<WIDTH;x++){
-    if(!g.seen.has(`${x},${y}`))continue;const px=ox+x*size,py=oy+y*size;
-    ctx.fillStyle=MAP[y][x]==='#'?'#3f5355':'#172e31';ctx.fillRect(px+1,py+1,size-2,size-2);
-    if(MAP[y][x]==='#')continue;
-    const p={x,y};let color='';if(same(p,CHEST))color=g.chestOpen?'#70634c':'#d9b574';if(same(p,SHRINE))color='#80d6c7';if(same(p,GATE)&&!g.gateOpen)color='#c8885a';if(same(p,EXIT))color='#c8ebe4';
-    if(ENCOUNTERS.some(e=>same(e,p)&&encounterActive(g,e.id)))color='#c27569';
+  const region=g.campaign?regionOf(g):undefined,map=region?.map??MAP,mw=map[0].length,mh=map.length,seen=region?new Set(g.campaign?.worldSeen?.[region.zone]??[]):g.seen;
+  const size=full?Math.min((width-24)/mw,(height-24)/mh):Math.min(width/9,height/9);
+  const ox=full?(width-mw*size)/2:width/2-(g.position.x+.5)*size,oy=full?(height-mh*size)/2:height/2-(g.position.y+.5)*size;
+  for(let y=0;y<mh;y++)for(let x=0;x<mw;x++){
+    if(!seen.has(`${x},${y}`))continue;const px=ox+x*size,py=oy+y*size;
+    ctx.fillStyle=map[y][x]==='#'?'#3f5355':'#172e31';ctx.fillRect(px+1,py+1,size-2,size-2);
+    if(map[y][x]==='#')continue;
+    const p={x,y};let color='';if(region?.passages.some(q=>same(p,q)))color='#80d6c7';if(region?.residents.some(q=>same(p,q)))color='#e2c476';if((!region||region.zone==='crypts')&&same(p,CHEST))color=g.chestOpen?'#70634c':'#d9b574';if((!region||region.zone==='crypts')&&same(p,SHRINE))color='#80d6c7';if((!region||region.zone==='crypts')&&same(p,GATE)&&!g.gateOpen)color='#c8885a';if((!region||region.zone==='crypts')&&same(p,EXIT))color='#c8ebe4';
+    if((region?.encounters??ENCOUNTERS).some(e=>same(e,p)&&encounterActive(g,e.id)))color='#c27569';
     if(color){ctx.fillStyle=color;ctx.beginPath();ctx.arc(px+size/2,py+size/2,size*.18,0,Math.PI*2);ctx.fill();}
   }
   const x=ox+(g.position.x+.5)*size,y=oy+(g.position.y+.5)*size;ctx.save();ctx.translate(x,y);ctx.rotate(g.direction*Math.PI/2);ctx.fillStyle='#f5dfb1';ctx.shadowColor='#eac381';ctx.shadowBlur=8;ctx.beginPath();ctx.moveTo(size*.34,0);ctx.lineTo(-size*.24,-size*.22);ctx.lineTo(-size*.13,0);ctx.lineTo(-size*.24,size*.22);ctx.closePath();ctx.fill();ctx.restore();

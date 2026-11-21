@@ -1,3 +1,4 @@
+import {regionWall,REGION_WORLDS,revealRegion} from './region-world.ts';
 import {CAMPAIGN_ENCOUNTERS,ROAD_ENCOUNTERS,refreshStats,xpNeeded} from './campaign.ts';
 import {createGame,PATROL_SITES,RESPAWN_DELAY} from './engine.ts';
 import type {Game} from './engine.ts';
@@ -15,11 +16,14 @@ export function deserialize(raw:string):Game|null{
       if(!c.roadAwayAt||typeof c.roadAwayAt!=='object'||Array.isArray(c.roadAwayAt)||Object.entries(c.roadAwayAt).some(([id,t])=>!ROAD_ENCOUNTERS.some(e=>e.id===id)||typeof t!=='number'||!Number.isFinite(t)||t<0))return null;
       g.campaign=structuredClone(c);refreshStats(g);
     }
-    if(g.campaign?.zone==='road'){if(s.position.y!==1||s.position.x<1||s.position.x>9)return null;}else if(wall(s.position.x,s.position.y))return null;
+    let position={...s.position},direction=s.direction;
+    if(g.campaign){const c=g.campaign;if(c.worldVersion!==undefined&&c.worldVersion!==1&&c.worldVersion!==2)return null;if(c.worldVersion!==2){if(c.zone!=='crypts'||regionWall(c.zone,position.x,position.y)){position={...REGION_WORLDS[c.zone].spawn};direction=REGION_WORLDS[c.zone].direction;}c.worldVersion=2;c.villageGateOpen=c.stage>=1;c.gateOpenedAt=undefined;c.worldSeen={};}else{if(regionWall(c.zone,position.x,position.y)||typeof c.villageGateOpen!=='boolean'||c.gateOpenedAt!==undefined&&(!Number.isFinite(c.gateOpenedAt)||c.gateOpenedAt<0))return null;}
+      if(c.worldSeen!==undefined){if(!c.worldSeen||typeof c.worldSeen!=='object'||Array.isArray(c.worldSeen))return null;for(const[zone,cells]of Object.entries(c.worldSeen)){if(!(zone in REGION_WORLDS)||!Array.isArray(cells)||cells.length>1500||cells.some(v=>typeof v!=='string'||!/^\d+,\d+$/.test(v)))return null;}}
+    }else if(wall(position.x,position.y))return null;
     for(let i=0;i<2;i++){const h=s.heroes[i];if(!h||!Number.isFinite(h.hp)||!Number.isFinite(h.mp)||h.hp<0||h.hp>g.heroes[i].maxHp||h.mp<0||h.mp>g.heroes[i].maxMp)return null;g.heroes[i].hp=h.hp;g.heroes[i].mp=h.mp;}
     if(g.heroes.every(h=>h.hp<=0)||g.campaign&&!g.campaign.recruited&&g.heroes[0].hp<=0)return null;
     for(const k of ['key','gateOpen','chestOpen','shrineUsed']as const){if(typeof s[k]!=='boolean')return null;g[k]=s[k];}
-    if(g.gateOpen&&!g.key||g.key!==g.chestOpen||!g.gateOpen&&same(s.position,GATE))return null;
+    if(g.gateOpen&&!g.key||g.key!==g.chestOpen||!g.gateOpen&&(!g.campaign||g.campaign.zone==='crypts')&&same(position,GATE))return null;
     if(!Array.isArray(s.cleared)||s.cleared.some((id:unknown)=>typeof id!=='string'||![...ENCOUNTERS,...CAMPAIGN_ENCOUNTERS].some(e=>e.id===id)))return null;
     if(!Array.isArray(s.seen)||s.seen.length>WIDTH*HEIGHT||s.seen.some((v:unknown)=>typeof v!=='string'||!/^\d+,\d+$/.test(v)||v.split(',').some((n,i)=>+n>=(i===0?WIDTH:HEIGHT))))return null;
     if(!Number.isFinite(s.gold)||s.gold<0||!Number.isFinite(s.playTime)||s.playTime<0)return null;
@@ -29,7 +33,7 @@ export function deserialize(raw:string):Game|null{
     if(s.respawnAt!==undefined&&(!s.respawnAt||typeof s.respawnAt!=='object'||Array.isArray(s.respawnAt)||Object.entries(s.respawnAt).some(([id,t])=>!PATROL_SITES.some(site=>site===id)||typeof t!=='number'||!Number.isFinite(t)||t<0)))return null;
     g.roaming=new Set(s.roaming??[]);g.respawnAt={...s.respawnAt};for(const id of Object.keys(g.respawnAt))g.respawnAt[id]=Math.min(g.respawnAt[id],s.playTime+RESPAWN_DELAY);
     for(const id of PATROL_SITES)if(s.cleared.includes(id)&&g.respawnAt[id]===undefined)g.respawnAt[id]=s.playTime+RESPAWN_DELAY;
-    g.position={...s.position};g.direction=s.direction;g.cleared=new Set(s.cleared);g.seen=new Set(s.seen);g.gold=s.gold;g.playTime=s.playTime;g.phase=s.complete?'complete':'explore';g.message='';return g;
+    g.position=position;g.direction=direction;g.cleared=new Set(s.cleared);g.seen=new Set(s.seen);g.gold=s.gold;g.playTime=s.playTime;g.phase=s.complete?'complete':'explore';g.message='';if(g.campaign)revealRegion(g);return g;
   }catch{return null;}
 }
 export function save(g:Game){try{localStorage.setItem(KEY,serialize(g));return true;}catch{return false;}}

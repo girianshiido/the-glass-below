@@ -11,7 +11,8 @@ Kael reaches Greyhaven with a letter he does not remember receiving. The village
 - An illustrated title screen with **New Game**, **Continue** and **Settings**.
 - Kael begins alone. Elara's road commission opens the glassworks investigation; Lys joins through dialogue after the furnace encounter.
 - Greyhaven includes Elder Elara, Mara's inn and Tovin's provisions. Dialogue and a journal track the chapter through its final report.
-- A regional map links the village, Old Pine Road, the glassworks and the crypts. Village and glassworks use original illustrated scenes; the road and crypts use first-person 3D exploration.
+- Greyhaven, Old Pine Road, the glassworks and the crypts form a connected journey. All four regions use first-person 3D exploration, with distant scenery, broad village squares, forest clearings and large furnace and crypt halls. The eastern village gate opens visibly; doors and stairs connect the regions on foot. The regional map is an orientation aid, without fast travel.
+- Elara, Mara, Tovin and Lys appear as illustrated full-body characters in the 3D world. Kael and Lys have original portraits in the party interface. Ordinary services open through nearby conversations.
 - Shared party XP and levels up to 20. Stats and skill power increase with level; Lys joins at the party's current level. Level-ups fully restore the active party.
 - Buy a tempered weapon, protective leather or a frostglass charm. Their attack, HP, defence and spell bonuses are applied in combat. Healing tonics restore 80 HP; the inn restores the party for 5 shards.
 - Automatic attacks, manual Fracture, Frost Shard and Mending Seal; tactical pause queues one order per hero, with ×1 / ×2 speed. Spell costs and current power are visible in their descriptions.
@@ -23,9 +24,11 @@ Kael reaches Greyhaven with a letter he does not remember receiving. The village
 
 Choose **New Game** to begin the new story. **Continue** preserves existing saves, including the earlier crypt-only prototype; starting a new journey asks before replacing progress. Save export/import remains available from Settings. All dialogue, progression, equipment, patrols and location state are saved automatically.
 
-The chapter has a complete quest route: clear the road, report to Elara, investigate the furnace, recruit Lys, recover the copper key, open the crypt gate, defeat the Warden and return the memory prism to Greyhaven. The region remains explorable after the ending.
+The chapter has a complete quest route: clear the road, optionally report to Elara, investigate the furnace, recruit Lys, recover the copper key, open the crypt gate, defeat the Warden and return the memory prism to Greyhaven. The region remains explorable after the ending.
 
-![Greyhaven](docs/chapter-greyhaven.jpg)
+![Greyhaven in 3D](docs/world-greyhaven.jpg)
+
+![Inside the glassworks](docs/world-glassworks.jpg)
 
 ## Returning patrols
 
@@ -39,11 +42,11 @@ Cleared sectors can repopulate after **20 seconds of active play outside the sec
 | Turn left / right | Left / Right |
 | Step sideways | A or Q / D |
 | Interact | E |
-| Region map (discovered map in legacy saves) | M |
+| Local discovered map | M |
 | Pause / resume combat | Space |
 | Fracture / Frost Shard / Mending Seal | 1 / 2 / 3 |
 
-The outdoor road follows a defined path through the forest. Travel between unlocked places is free outside combat. Retreat preserves HP/MP and resets undefeated opponents. Combat saves resume at the encounter checkpoint rather than mid-animation.
+The outdoor road follows a defined path through the forest. Walk through the eastern village gate to reach the road, enter the distant glassworks facade, and find the marked stairs in the north-east corner of its great hall. The entrance stairs provide a return route; the Warden chamber has another staircase. The Region button provides an overview. Retreat preserves HP/MP and resets undefeated opponents. Combat saves resume at the encounter checkpoint rather than mid-animation.
 
 ## Development
 
@@ -56,12 +59,14 @@ pnpm test
 pnpm build
 ```
 
-The build checks TypeScript, produces `dist/`, builds the versioned offline cache and packages `release/The-Glass-Below.html`. The standalone HTML embeds the environment illustrations, creatures and both audio codecs. Installation as a PWA requires HTTPS. Browser storage is versioned and existing prototype saves remain compatible.
+The build checks TypeScript, produces `dist/`, builds the versioned offline cache and packages `release/The-Glass-Below.html`. The standalone HTML embeds the environment illustrations, creatures and both audio codecs. Installation as a PWA requires HTTPS. Browser storage is versioned and existing prototype saves remain compatible. Chapter 1.0 saves migrate to valid positions in the expanded regions, preserving progression, equipment and health.
 
 - `src/campaign.ts`: chapter state, XP, equipment, quests, travel and outdoor patrol rules.
-- `src/chapter-ui.ts` and `src/chapter.css`: dialogue, village, region map, journal and party UI.
+- `src/chapter-ui.ts` and `src/chapter.css`: dialogue, region map, journal and party UI.
 - `src/engine.ts`: deterministic world/combat simulation, legacy crypt mode and patrols.
-- `src/renderer.ts`: 3D stone architecture and forest geometry, animated creature billboards.
+- `src/region-world.ts`: two-dimensional region maps, buildings, residents, physical passages and discovery.
+- `src/region-geometry.ts`: village architecture, gateposts, trees, furnaces, pillars, staircases and distant landmarks.
+- `src/renderer.ts`: textured 3D rendering, gate animation, depth fog and illustrated character billboards.
 - `src/impact-art.ts` and `src/spell-art.ts`: procedural combat animations.
 - `src/save.ts`, `src/audio.ts` and `src/updates.ts`: persistence, Web Audio and explicit updates.
 
@@ -71,6 +76,6 @@ Editable MIDI scores and render reports are in `music/`. Run `python3 scripts/re
 
 ## Verification and deployment
 
-Automated tests cover both the legacy expedition and the complete chapter quest chain, solo/recruited combat, XP and equipment effects, save migration, map constraints, patrol timing/visibility, audio codecs/scene transitions, update checks and creature/effect framing. Browser checks cover desktop, tablet and iPhone-sized portrait/landscape layouts. Physical-device Safari audio, battery use and PWA installation still require on-device checks.
+Automated tests cover both the legacy expedition and the complete chapter quest chain, solo/recruited combat, XP and equipment effects, save migration, map constraints, patrol timing/visibility, audio codecs/scene transitions, update checks and creature/effect framing. Browser checks cover desktop, tablet and iPhone-sized portrait/landscape layouts. The reproducible local scene launcher at `tests/visual-qa.html` checks the village, kiln stairs and great crypt hall without playing through the entire chapter. Physical-device Safari audio, battery use and PWA installation still require on-device checks.
 
 `.github/workflows/deploy.yml` tests, builds and deploys `dist/` on pushes to `main`. GitHub Pages uses GitHub Actions and relative asset paths. Environment illustrations are original generated artwork; the existing creature drawings are unchanged. Hollow Oath informed the illustrated combat style and Dinosaur Resurrection only the exploration perspective; no assets from either game are included.
