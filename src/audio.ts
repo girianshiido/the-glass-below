@@ -79,6 +79,8 @@ export class GameAudio {
       this.buffers.delete(key);return undefined;
     })();this.buffers.set(key,loading);return loading;
   }
+  private footstep=0;
+  playFootstep(surface:'stone'|'earth'){const variant=[0,1,2,1][this.footstep++%4];this.play(surface==='earth'?(['step-earth-1','step-earth-2','step-earth-3']as const)[variant]:(['step','step-stone-2','step-stone-3']as const)[variant]);}
   play(sound:Sound){
     if(!this.context||this.context.state!=='running'||this.settings.muted||this.settings.effects===0||this.hidden||this.paused)return;
     const now=this.now(),last=this.lastEffect.get(sound)??-Infinity;if(now-last<65)return;this.lastEffect.set(sound,now);

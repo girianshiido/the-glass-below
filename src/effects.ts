@@ -3,7 +3,7 @@ import {encounterDefinition} from './engine.ts';
 import type {Feedback,Game} from './engine.ts';
 import type {Camera} from './renderer.ts';
 import type {Sound} from './audio-state.ts';
-import {projectCreatureCenter,DEFAULT_INSETS} from './combat-view.ts';
+import {projectCreatureCenter,DEFAULT_INSETS,battlePosition} from './combat-view.ts';
 import type {CombatInsets} from './combat-view.ts';
 import {drawThinImpact} from './impact-art.ts';
 export interface EffectSpec {cell:number;duration:number;sound:Sound;rotation:number;art:'stroke'|'spell'}
@@ -18,7 +18,8 @@ export function effectFor(f:Feedback):EffectSpec{
 export function impactAnchor(g:Game,camera:Camera,width:number,height:number,f:Feedback,insets:CombatInsets=DEFAULT_INSETS){
   if(f.hero!==undefined)return{x:f.hero===0?28:72,y:f.kind==='heal'?78:70};
   const encounter=g.battle?encounterDefinition(g.battle.encounter):undefined;if(!encounter)return{x:50,y:52};
-  const c=Math.cos(camera.yaw),s=Math.sin(camera.yaw),dx=(encounter.x-camera.x)*2.6,dz=(encounter.y-camera.y)*2.6;
+  const place=g.campaign&&g.battle?battlePosition(g.position,encounter,g.battle.time):encounter;
+  const c=Math.cos(camera.yaw),s=Math.sin(camera.yaw),dx=(place.x-camera.x)*2.6,dz=(place.y-camera.y)*2.6;
   const advance=g.battle?Math.max(0,...g.battle.enemies.map(e=>{const age=g.battle!.time-e.strikeAt;return age>=0&&age<.3?Math.sin(age/.3*Math.PI)*.22:0;})):0;
   const depth=Math.max(.7,c*dx+s*dz-advance),right=-s*dx+c*dz;
   return projectCreatureCenter(encounter.kind,width,height,depth,right,insets);

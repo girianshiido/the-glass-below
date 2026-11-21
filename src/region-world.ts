@@ -3,18 +3,20 @@ import type {Game} from './engine.ts';
 import {MAP as OLD_MAP,ENCOUNTERS as OLD_ENCOUNTERS} from './world.ts';
 import type {Point,EncounterDef} from './world.ts';
 export interface Building{x:number;y:number;w:number;d:number;h:number;roof:number;kind:'inn'|'shop'|'house'|'hall'|'factory'|'tower'}
+export interface Entrance extends Point{id:'inn'|'shop';direction:number}
 export interface Resident extends Point{id:'elara'|'inn'|'shop'|'lys';name:string;frame:number}
 export interface Passage extends Point{id:string;to:Zone;spawn:Point;direction:number;label:string}
-export interface RegionWorld{zone:Zone;map:string[];spawn:Point;direction:number;buildings:Building[];residents:Resident[];passages:Passage[];encounters:EncounterDef[];ceiling:number;outdoor:boolean}
+export interface RegionWorld{zone:Zone;map:string[];spawn:Point;direction:number;buildings:Building[];residents:Resident[];entrances:Entrance[];passages:Passage[];encounters:EncounterDef[];ceiling:number;outdoor:boolean}
 const open=(w:number,h:number)=>Array.from({length:h},(_,y)=>Array.from({length:w},(_,x)=>x===0||y===0||x===w-1||y===h-1?'#':'.'));
 const rect=(m:string[][],x:number,y:number,w:number,h:number,c='#')=>{for(let j=y;j<y+h;j++)for(let i=x;i<x+w;i++)m[j][i]=c;};
-const village=open(25,21),road=Array.from({length:21},()=>Array(25).fill('#')),works=open(23,19);
-const buildings:Building[]=[{x:3,y:6,w:5,d:4,h:3.3,roof:2,kind:'inn'},{x:17,y:9,w:5,d:4,h:3.1,roof:1.8,kind:'shop'},{x:3,y:14,w:5,d:4,h:3,roof:1.7,kind:'house'},{x:17,y:3,w:5,d:4,h:3.5,roof:2,kind:'house'},{x:9,y:3,w:5,d:4,h:4,roof:2.5,kind:'hall'},{x:15,y:3,w:2,d:2,h:8,roof:2,kind:'tower'}];
+const village=open(21,17),road=Array.from({length:21},()=>Array(25).fill('#')),works=open(23,19);
+const buildings:Building[]=[{x:3,y:5,w:3,d:3,h:4.7,roof:1.9,kind:'inn'},{x:15,y:8,w:3,d:3,h:4.6,roof:1.7,kind:'shop'},{x:3,y:11,w:3,d:3,h:4.5,roof:1.7,kind:'house'},{x:15,y:2,w:3,d:3,h:4.8,roof:1.8,kind:'house'},{x:8,y:2,w:5,d:3,h:5.1,roof:2.2,kind:'hall'},{x:13,y:2,w:1,d:2,h:6.5,roof:1.6,kind:'tower'}];
 for(const b of buildings)rect(village,b.x,b.y,b.w,b.d);
-village[10][24]='.';village[10][12]='#';
-// A broad two-dimensional forest path joins several clearings, rather than a line of tiles.
-for(let x=0;x<25;x++){const center=x<9?10:x<17?10-Math.floor((x-8)/2):6;for(let y=center-2;y<=center+2;y++)if(y>0&&y<20)road[y][x]='.';}
-rect(road,9,5,7,9,'.');rect(road,18,3,6,8,'.');road[10][0]='.';road[6][24]='.';
+export const VILLAGE_DETAILS=[[10,8],[8,8],[12,8],[7,9],[13,9]]as const;
+village[8][20]='.';for(const[x,y]of VILLAGE_DETAILS)village[y][x]='#';
+// A narrow woodland trail, with small clearings and connected steps at its bends.
+let previous=10;for(let x=0;x<25;x++){const center=x<9?10:x<17?10-Math.floor((x-8)/2):6;for(let y=Math.min(previous,center);y<=Math.max(previous,center);y++)road[y][x]='.';if(x<4)for(let y=9;y<=11;y++)road[y][x]='.';previous=center;}
+rect(road,10,8,3,3,'.');rect(road,18,5,3,3,'.');road[10][0]='.';road[6][24]='.';
 // Broad furnace and workshop halls, with a traversable opening between their columns.
 rect(works,3,4,4,4);rect(works,16,4,4,4);rect(works,3,12,4,3);rect(works,17,12,3,3);
 for(const [x,y]of [[9,5],[13,5],[9,12],[13,12]])works[y][x]='#';
@@ -26,10 +28,10 @@ rect(crypt,11,10,7,3,'.');
 for(let x=11;x<=16;x++){crypt[9][x]='#';crypt[13][x]='#';}for(let y=10;y<=13;y++)crypt[y][10]='#'; // The northern copper gate is the only entrance to the great hall.
 const finish=(m:string[][])=>m.map(r=>r.join(''));
 export const REGION_WORLDS:Record<Zone,RegionWorld>={
- village:{zone:'village',map:finish(village),spawn:{x:12,y:15},direction:3,buildings,residents:[{id:'elara',name:'Elder Elara',frame:0,x:11,y:8},{id:'inn',name:'Mara',frame:1,x:5,y:10},{id:'shop',name:'Tovin',frame:2,x:19,y:13}],passages:[{id:'pine-gate',x:24,y:10,to:'road',spawn:{x:1,y:10},direction:0,label:'Old Pine Road'}],encounters:[],ceiling:0,outdoor:true},
- road:{zone:'road',map:finish(road),spawn:{x:1,y:10},direction:0,buildings:[],residents:[],passages:[{id:'village-return',x:0,y:10,to:'village',spawn:{x:23,y:10},direction:2,label:'Greyhaven'},{id:'glassworks-door',x:24,y:6,to:'glassworks',spawn:{x:11,y:16},direction:3,label:'Enter the glassworks'}],encounters:[{id:'road-shards',x:6,y:10,kind:'scavenger'},{id:'road-hollow',x:13,y:8,kind:'scavenger'},{id:'road-lantern',x:20,y:6,kind:'wraith'}],ceiling:0,outdoor:true},
- glassworks:{zone:'glassworks',map:finish(works),spawn:{x:11,y:16},direction:3,buildings:[],residents:[{id:'lys',name:'Lys',frame:3,x:18,y:3}],passages:[{id:'works-return',x:11,y:18,to:'road',spawn:{x:23,y:6},direction:2,label:'Old Pine Road'},{id:'crypt-stairs',x:19,y:0,to:'crypts',spawn:{x:1,y:1},direction:0,label:'Descend into the crypts'}],encounters:[{id:'furnace',kind:'wraith',x:11,y:7}],ceiling:6.5,outdoor:false},
- crypts:{zone:'crypts',map:finish(crypt),spawn:{x:1,y:1},direction:0,buildings:[],residents:[],passages:[{id:'crypt-return',x:1,y:1,to:'glassworks',spawn:{x:19,y:1},direction:1,label:'Climb to the glassworks'},{id:'warden-stairs',x:17,y:13,to:'glassworks',spawn:{x:19,y:1},direction:1,label:'Climb to the glassworks'}],encounters:OLD_ENCOUNTERS.map(e=>({...e})),ceiling:4.3,outdoor:false},
+ village:{zone:'village',map:finish(village),spawn:{x:10,y:11},direction:3,buildings,residents:[{id:'elara',name:'Elder Elara',frame:0,x:9,y:6}],entrances:[{id:'inn',x:4,y:8,direction:3},{id:'shop',x:16,y:11,direction:3}],passages:[{id:'pine-gate',x:20,y:8,to:'road',spawn:{x:0,y:10},direction:0,label:'Old Pine Road'}],encounters:[],ceiling:0,outdoor:true},
+ road:{zone:'road',map:finish(road),spawn:{x:1,y:10},direction:0,buildings:[],residents:[],entrances:[],passages:[{id:'village-return',x:0,y:10,to:'village',spawn:{x:20,y:8},direction:2,label:'Greyhaven'},{id:'glassworks-door',x:24,y:6,to:'glassworks',spawn:{x:11,y:16},direction:3,label:'Enter the glassworks'}],encounters:[{id:'road-shards',x:6,y:10,kind:'scavenger'},{id:'road-hollow',x:13,y:8,kind:'scavenger'},{id:'road-lantern',x:20,y:6,kind:'wraith'}],ceiling:0,outdoor:true},
+ glassworks:{zone:'glassworks',map:finish(works),spawn:{x:11,y:16},direction:3,buildings:[],residents:[{id:'lys',name:'Lys',frame:3,x:18,y:3}],entrances:[],passages:[{id:'works-return',x:11,y:18,to:'road',spawn:{x:23,y:6},direction:2,label:'Old Pine Road'},{id:'crypt-stairs',x:19,y:0,to:'crypts',spawn:{x:1,y:1},direction:0,label:'Descend into the crypts'}],encounters:[{id:'furnace',kind:'wraith',x:11,y:7}],ceiling:6.5,outdoor:false},
+ crypts:{zone:'crypts',map:finish(crypt),spawn:{x:1,y:1},direction:0,buildings:[],residents:[],entrances:[],passages:[{id:'crypt-return',x:1,y:1,to:'glassworks',spawn:{x:19,y:1},direction:1,label:'Climb to the glassworks'},{id:'warden-stairs',x:17,y:13,to:'glassworks',spawn:{x:19,y:1},direction:1,label:'Climb to the glassworks'}],encounters:OLD_ENCOUNTERS.map(e=>({...e})),ceiling:4.3,outdoor:false},
 };
 export function regionOf(g:Game){return REGION_WORLDS[g.campaign?.zone??'crypts'];}
 export function regionWall(zone:Zone,x:number,y:number){return REGION_WORLDS[zone].map[y]?.[x]!=='.';}
@@ -41,3 +43,14 @@ export function passageLocked(g:Game,p:Passage){const c=g.campaign;if(!c)return 
 export function passageHint(g:Game,p:Passage){if(p.id==='pine-gate'&&g.campaign!.stage<1)return 'Speak to Elder Elara before leaving Greyhaven.';if(p.id==='pine-gate'&&!g.campaign!.villageGateOpen)return 'Open the pine gate';if(p.id==='pine-gate'&&g.campaign!.gateOpenedAt!==undefined&&g.playTime-g.campaign!.gateOpenedAt<.9)return 'The pine gate is opening…';if(p.id==='glassworks-door'&&g.campaign!.stage<2)return 'Clear the three threats on the road first.';if(p.id==='crypt-stairs'&&!g.campaign!.recruited)return 'Find Lys before descending.';return p.label;}
 
 export function revealRegion(g:Game){const c=g.campaign;if(!c)return;const w=regionOf(g),seen=new Set(c.worldSeen?.[c.zone]??[]);for(let y=Math.max(0,g.position.y-10);y<Math.min(w.map.length,g.position.y+11);y++)for(let x=Math.max(0,g.position.x-10);x<Math.min(w.map[0].length,g.position.x+11);x++){if(regionSight(c.zone,g.position,{x,y},g.gateOpen))seen.add(`${x},${y}`);else if(regionWall(c.zone,x,y))for(const[dx,dy]of [[1,0],[-1,0],[0,1],[0,-1]])if(regionSight(c.zone,g.position,{x:x+dx*.6,y:y+dy*.6},g.gateOpen))seen.add(`${x},${y}`);}c.worldSeen??={};c.worldSeen[c.zone]=[...seen];}
+
+/** The gate and first trail tile occupy exactly the same point in the outdoor scene. */
+export function regionOffset(zone:Zone):Point{return zone==='road'?{x:20,y:-2}:{x:0,y:0};}
+export function sharedOutdoors(a:Zone,b:Zone){return (a==='village'||a==='road')&&(b==='village'||b==='road');}
+export function entranceAhead(g:Game){if(!g.campaign||g.phase!=='explore')return;const dirs=[[1,0],[0,1],[-1,0],[0,-1]],d=dirs[g.direction];return regionOf(g).entrances.find(p=>p.direction===g.direction&&(p.x===g.position.x+d[0]&&p.y===g.position.y+d[1]||p.x===g.position.x&&p.y===g.position.y));}
+export function nearbyEntrance(g:Game){if(!g.campaign||g.phase!=='explore')return;return regionOf(g).entrances.find(p=>Math.abs(p.x-g.position.x)+Math.abs(p.y-g.position.y)<=1);}
+export function roadThreat(g:Game){if(g.campaign?.zone!=='road'||g.phase!=='explore')return;return regionOf(g).encounters.filter(e=>(!g.cleared.has(e.id)||g.roaming.has(e.id))&&Math.hypot(e.x-g.position.x,e.y-g.position.y)<=2.15&&regionSight('road',g.position,e)).sort((a,b)=>Math.hypot(a.x-g.position.x,a.y-g.position.y)-Math.hypot(b.x-g.position.x,b.y-g.position.y))[0];}
+const trailSegments:{ax:number;ay:number;bx:number;by:number}[]=[];
+for(let y=0;y<road.length;y++)for(let x=0;x<road[0].length;x++)if(road[y][x]==='.')for(const[dx,dy]of [[1,0],[0,1]])if(road[y+dy]?.[x+dx]==='.')trailSegments.push({ax:x,ay:y,bx:x+dx,by:y+dy});
+/** Soft, uneven banks follow the connected path rather than the square tile perimeter. */
+export function trailCoverage(x:number,y:number){let distance=Infinity;for(const s of trailSegments){const dx=s.bx-s.ax,dy=s.by-s.ay,t=Math.max(0,Math.min(1,((x-s.ax)*dx+(y-s.ay)*dy)/(dx*dx+dy*dy)));distance=Math.min(distance,Math.hypot(x-s.ax-t*dx,y-s.ay-t*dy));}const rough=.047*Math.sin(x*17+y*23)+.035*Math.sin(x*37-y*13)+.025*Math.sin(x*7+y*9),width=.48+.065*Math.sin(x*1.9+y*.8)+rough;return Math.max(0,Math.min(1,(width+.13-distance)/.22));}

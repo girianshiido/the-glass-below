@@ -1,11 +1,11 @@
-import {REGION_WORLDS,regionSight,regionWall,nearbyPassage,passageLocked} from './region-world.ts';
+import {REGION_WORLDS,regionSight,regionWall,nearbyPassage,passageLocked,sharedOutdoors} from './region-world.ts';
 import type {Game} from './engine.ts';
 export type Zone='village'|'road'|'glassworks'|'crypts';
 export interface Campaign {worldVersion?:number;worldSeen?:Partial<Record<Zone,string[]>>;villageGateOpen?:boolean;gateOpenedAt?:number;zone:Zone;stage:number;recruited:boolean;level:number;xp:number;potions:number;weapon:'iron'|'tempered';armor:'travel'|'warden';charm:boolean;introRead:boolean;roadCleared:string[];roadAwayAt:Record<string,number>;visited:Zone[]}
 export const ROAD_ENCOUNTERS=REGION_WORLDS.road.encounters;
 export const FURNACE=REGION_WORLDS.glassworks.encounters[0];
 export const CAMPAIGN_ENCOUNTERS=[...ROAD_ENCOUNTERS,FURNACE];
-export function setupCampaign(g:Game){g.campaign={worldVersion:2,villageGateOpen:false,zone:'village',stage:0,recruited:false,level:1,xp:0,potions:3,weapon:'iron',armor:'travel',charm:false,introRead:false,roadCleared:[],roadAwayAt:{},visited:['village']};g.position={...REGION_WORLDS.village.spawn};g.direction=3;g.gold=20;refreshStats(g);return g;}
+export function setupCampaign(g:Game){g.campaign={worldVersion:3,villageGateOpen:false,zone:'village',stage:0,recruited:false,level:1,xp:0,potions:3,weapon:'iron',armor:'travel',charm:false,introRead:false,roadCleared:[],roadAwayAt:{},visited:['village']};g.position={...REGION_WORLDS.village.spawn};g.direction=3;g.gold=20;refreshStats(g);return g;}
 export function activeHero(g:Game,index:number){return !g.campaign||index===0||g.campaign.recruited;}
 export function xpNeeded(level:number){return 50+(level-1)*35;}
 export function refreshStats(g:Game){const c=g.campaign;if(!c)return;g.heroes.forEach((h,i)=>{h.maxHp=(i===0?180:140)+(c.level-1)*(i===0?18:14)+(c.armor==='warden'?20:0);h.maxMp=(i===0?32:44)+(c.level-1)*4;h.attack=(i===0?16:10)+(c.level-1)*3+(c.weapon==='tempered'?5:0);h.hp=Math.min(h.hp,h.maxHp);h.mp=Math.min(h.mp,h.maxMp);});}
@@ -36,4 +36,4 @@ export function campaignAction(g:Game,action:string){const c=g.campaign;if(!c||g
  return false;
 }
 export function roadMove(g:Game,relative:number){const c=g.campaign;if(!c||c.zone!=='road'||g.phase!=='explore')return null;const d=(g.direction+relative+4)%4,dirs=[[1,0],[0,1],[-1,0],[0,-1]],next={x:g.position.x+dirs[d][0],y:g.position.y+dirs[d][1]};if(regionWall('road',next.x,next.y))return false;return ROAD_ENCOUNTERS.find(e=>e.x===next.x&&e.y===next.y&&(!g.cleared.has(e.id)||g.roaming.has(e.id)))??next;}
-export function crossPassage(g:Game){const p=nearbyPassage(g);if(!p||passageLocked(g,p))return false;if(!travel(g,p.to))return false;g.position={...p.spawn};g.direction=p.direction;return true;}
+export function crossPassage(g:Game){const p=nearbyPassage(g);if(!p||passageLocked(g,p))return false;const from=g.campaign!.zone,direction=g.direction;if(!travel(g,p.to))return false;g.position={...p.spawn};g.direction=sharedOutdoors(from,p.to)?direction:p.direction;return true;}

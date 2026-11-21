@@ -1,20 +1,25 @@
-import {REGION_WORLDS,regionWall} from './region-world.ts';
+import {REGION_WORLDS,regionWall,VILLAGE_DETAILS,trailCoverage} from './region-world.ts';
 import type {Zone} from './campaign.ts';
 export type Vec=[number,number,number];
 export const CELL=2.6;
-export type Material='stone'|'floor'|'cobble'|'wood'|'plaster'|'roof'|'grass'|'path'|'leaf'|'metal'|'glass'|'water'|'mountain'|'shadow';
-export const COLORS:Record<Material,Vec>={shadow:[.03,.06,.05],cobble:[.86,.9,.84],stone:[.66,.72,.7],floor:[.73,.77,.72],wood:[.95,.9,.84],plaster:[1,1,1],roof:[.9,1,.98],grass:[.31,.48,.34],path:[1,1,1],leaf:[.18,.34,.28],metal:[.47,.35,.22],glass:[1,.64,.27],water:[.2,.78,.81],mountain:[.3,.42,.46]};
+export type Material='stone'|'floor'|'cobble'|'wood'|'plaster'|'roof'|'grass'|'path'|'leaf'|'metal'|'glass'|'water'|'mountain'|'shadow'|'coolglass'|'ember'|'fieldstone'|'brick'|'cutstone';
+export const COLORS:Record<Material,Vec>={cutstone:[.87,.88,.8],fieldstone:[1,.97,.88],brick:[1.3,.78,.55],ember:[1,.55,.17],coolglass:[.2,.78,.81],shadow:[.03,.06,.05],cobble:[.86,.9,.84],stone:[.66,.72,.7],floor:[.73,.77,.72],wood:[.95,.9,.84],plaster:[1,1,1],roof:[.9,1,.98],grass:[.31,.48,.34],path:[1,1,1],leaf:[.18,.34,.28],metal:[.47,.35,.22],glass:[1,.94,.86],water:[.35,.63,.7],mountain:[.3,.42,.46]};
 export function quad(out:number[],a:Vec,b:Vec,c:Vec,d:Vec,n:Vec,uv=[0,0,1,1]){const[u0,v0,u1,v1]=uv;for(const[p,u,v]of [[a,u0,v0],[b,u1,v0],[c,u1,v1],[a,u0,v0],[c,u1,v1],[d,u0,v1]]as [Vec,number,number][])out.push(...p,...n,u,v);}
-export function box(out:number[],x:number,y:number,z:number,w:number,h:number,d:number){const a=x-w/2,b=x+w/2,c=z-d/2,e=z+d/2,t=y+h;quad(out,[a,y,c],[b,y,c],[b,t,c],[a,t,c],[0,0,-1]);quad(out,[b,y,e],[a,y,e],[a,t,e],[b,t,e],[0,0,1]);quad(out,[a,y,e],[a,y,c],[a,t,c],[a,t,e],[-1,0,0]);quad(out,[b,y,c],[b,y,e],[b,t,e],[b,t,c],[1,0,0]);quad(out,[a,t,c],[b,t,c],[b,t,e],[a,t,e],[0,1,0]);}
+export function box(out:number[],x:number,y:number,z:number,w:number,h:number,d:number){const a=x-w/2,b=x+w/2,c=z-d/2,e=z+d/2,t=y+h;quad(out,[a,y,c],[b,y,c],[b,t,c],[a,t,c],[0,0,-1],[0,0,w/2.6,h/2.6]);quad(out,[b,y,e],[a,y,e],[a,t,e],[b,t,e],[0,0,1],[0,0,w/2.6,h/2.6]);quad(out,[a,y,e],[a,y,c],[a,t,c],[a,t,e],[-1,0,0],[0,0,d/2.6,h/2.6]);quad(out,[b,y,c],[b,y,e],[b,t,e],[b,t,c],[1,0,0],[0,0,d/2.6,h/2.6]);quad(out,[a,t,c],[b,t,c],[b,t,e],[a,t,e],[0,1,0]);}
 export function cone(out:number[],x:number,z:number,y:number,r:number,h:number,sides=10){for(let k=0;k<sides;k++){const a=k*Math.PI*2/sides,b=(k+1)*Math.PI*2/sides;quad(out,[x+Math.cos(a)*r,y,z+Math.sin(a)*r],[x+Math.cos(b)*r,y,z+Math.sin(b)*r],[x,y+h,z],[x,y+h,z],[Math.cos((a+b)/2),r/h,Math.sin((a+b)/2)]);}}
+export function cylinder(out:number[],x:number,z:number,y:number,r:number,h:number,sides=20){for(let k=0;k<sides;k++){const a=k*Math.PI*2/sides,b=(k+1)*Math.PI*2/sides,p:Vec=[x+Math.cos(a)*r,y,z+Math.sin(a)*r],q:Vec=[x+Math.cos(b)*r,y,z+Math.sin(b)*r];quad(out,p,q,[q[0],y+h,q[2]],[p[0],y+h,p[2]],[Math.cos((a+b)/2),0,Math.sin((a+b)/2)],[k/sides,0,(k+1)/sides,h]);quad(out,[x,y+h,z],[p[0],y+h,p[2]],[q[0],y+h,q[2]],[x,y+h,z],[0,1,0]);}}
+function ring(out:number[],x:number,z:number,y:number,r:number,inside:number,h:number){for(let k=0;k<24;k++){const a=k*Math.PI/12,b=(k+1)*Math.PI/12,p=(angle:number,radius:number,top:number):Vec=>[x+Math.cos(angle)*radius,top,z+Math.sin(angle)*radius];quad(out,p(a,r,y),p(b,r,y),p(b,r,y+h),p(a,r,y+h),[Math.cos(a),0,Math.sin(a)]);quad(out,p(b,inside,y),p(a,inside,y),p(a,inside,y+h),p(b,inside,y+h),[-Math.cos(a),0,-Math.sin(a)]);quad(out,p(a,inside,y+h),p(a,r,y+h),p(b,r,y+h),p(b,inside,y+h),[0,1,0]);}}
+function fountain(stone:number[],water:number[]){const x=10*CELL,z=8*CELL;cylinder(stone,x,z,.01,1.22,.12);cylinder(stone,x,z,.13,1.12,.08);ring(stone,x,z,.2,1.06,.85,.34);ring(stone,x,z,.52,1.13,.82,.12);cylinder(water,x,z,.42,.84,.012,32);cylinder(stone,x,z,.2,.23,.86);cylinder(stone,x,z,.88,.35,.12);cone(stone,x,z,1.03,.61,-.2,24);ring(stone,x,z,1.02,.62,.53,.13);cylinder(water,x,z,1.1,.53,.01,28);cylinder(stone,x,z,1.1,.1,.3);for(let j=0;j<6;j++){const angle=j*Math.PI/3;for(let k=0;k<16;k++){const t=k/16,u=(k+1)/16;const point=(v:number):Vec=>[x+Math.cos(angle)*(.14+v*.64),1.37+.56*Math.sin(v*Math.PI)-v*.94,z+Math.sin(angle)*(.14+v*.64)],a=point(t),b=point(u);quad(water,[a[0]-.018,a[1],a[2]],[a[0]+.018,a[1],a[2]],[b[0]+.018,b[1],b[2]],[b[0]-.018,b[1],b[2]],[0,1,0]);quad(water,[a[0],a[1],a[2]-.018],[a[0],a[1],a[2]+.018],[b[0],b[1],b[2]+.018],[b[0],b[1],b[2]-.018],[1,0,0]);}}}
+function hangingEmblem(wood:number[],metal:number[],x:number,z:number,shop:boolean){box(metal,x,2.65,z-.25,.08,.08,.7);for(const side of [-1,1])box(metal,x+side*.24,2.19,z,.035,.45,.035);const points=[[-.45,.3],[.36,.35],[.49,.1],[.38,-.32],[.06,-.41],[-.4,-.28],[-.5,.07]];for(let k=0;k<points.length;k++){const a=points[k],b=points[(k+1)%points.length];quad(wood,[x,1.97,z],[x+a[0],1.97+a[1],z],[x+b[0],1.97+b[1],z],[x,1.97,z],[0,0,1]);}if(shop){box(metal,x,1.73,z+.03,.055,.48,.04);box(metal,x,1.86,z+.04,.3,.05,.045);cone(metal,x,z+.04,2.21,.07,.1,4);}else{box(metal,x-.04,1.77,z+.03,.26,.31,.035);for(const dy of [0,.2])box(metal,x+.17,1.8+dy,z+.04,.15,.04,.04);box(metal,x+.23,1.8,z+.04,.04,.24,.04);}}
 function pine(leaves:number[],trunk:number[],shadows:number[],x:number,z:number,h:number,seed:number){box(trunk,x,0,z,.3,h,.33);for(let layer=0;layer<6;layer++){const base=1.2+layer*h*.13,r=(h*.29)*(1-layer*.12),top=base+h*.44;for(let k=0;k<9;k++){const a=k*Math.PI*2/9,b=(k+1)*Math.PI*2/9,ra=r*(.88+.14*Math.sin(k*13+seed)),rb=r*(.88+.14*Math.sin((k+1)*13+seed));quad(leaves,[x+Math.cos(a)*ra,base+Math.sin(k*7+seed)*.2,z+Math.sin(a)*ra],[x+Math.cos(b)*rb,base+Math.sin((k+1)*7+seed)*.2,z+Math.sin(b)*rb],[x,top,z],[x,top,z],[Math.cos((a+b)/2),.48,Math.sin((a+b)/2)]);}}
  for(let k=0;k<12;k++){const a=k*Math.PI/6,b=(k+1)*Math.PI/6;quad(shadows,[x,.012,z],[x+Math.cos(a)*h*.3,.012,z+Math.sin(a)*h*.3],[x+Math.cos(b)*h*.3,.012,z+Math.sin(b)*h*.3],[x,.012,z],[0,1,0]);}}
-export function regionGeometry(zone:Zone){const w=REGION_WORLDS[zone],groups={}as Record<Material,number[]>;for(const k of Object.keys(COLORS)as Material[])groups[k]=[];const {stone,floor,cobble,wood,plaster,roof,grass,path,leaf,metal,glass,water,mountain,shadow}=groups;
+export function forestTrees(){const trees:{x:number;z:number;height:number;radius:number;seed:number}[]=[],map=REGION_WORLDS.road.map,tiles=map.flatMap((row,y)=>[...row].flatMap((c,x)=>c==='.'?[{x:x*CELL,z:y*CELL}]:[]));for(let y=-3;y<map.length+3;y++)for(let x=1;x<map[0].length+3;x++){if(!regionWall('road',x,y)||x>23&&Math.abs(y-6)<2)continue;const tx=x*CELL+Math.sin(x*73+y*19)*.65,tz=y*CELL+Math.sin(y*17+x)*.65,h=6.4+2*Math.sin(x*5+y*8),radius=h*.29*1.03;if(tiles.some(p=>Math.hypot(Math.max(0,Math.abs(tx-p.x)-CELL/2),Math.max(0,Math.abs(tz-p.z)-CELL/2))<radius+.45))continue;trees.push({x:tx,z:tz,height:h,radius,seed:x*31+y*7});}return trees;}
+export function regionGeometry(zone:Zone){const w=REGION_WORLDS[zone],groups={}as Record<Material,number[]>;for(const k of Object.keys(COLORS)as Material[])groups[k]=[];const {stone,floor,cobble,wood,plaster,roof,grass,path,leaf,metal,glass,water,mountain,shadow,coolglass,ember,fieldstone,brick,cutstone}=groups;
  const width=w.map[0].length,height=w.map.length;
- if(w.outdoor){quad(grass,[-90,-.07,-90],[150,-.07,-90],[150,-.07,150],[-90,-.07,150],[0,1,0],[0,0,30,30]);for(let k=0;k<26;k++){const a=k*Math.PI*2/26,r=105+10*Math.sin(k*9);cone(mountain,width*CELL/2+Math.cos(a)*r,height*CELL/2+Math.sin(a)*r,-4,23+9*Math.sin(k*4),25+12*Math.sin(k*7),6);}}
+ if(zone==='village'){quad(grass,[-90,-.07,-90],[150,-.07,-90],[150,-.07,150],[-90,-.07,150],[0,1,0],[0,0,30,30]);for(let k=0;k<26;k++){const a=k*Math.PI*2/26,r=150+10*Math.sin(k*9);cone(mountain,20*CELL+Math.cos(a)*r,8*CELL+Math.sin(a)*r,-4,23+9*Math.sin(k*4),25+12*Math.sin(k*7),6);}}
  for(let y=0;y<height;y++)for(let x=0;x<width;x++){
-  if(regionWall(zone,x,y))continue;const l=(x-.5)*CELL,r=(x+.5)*CELL,t=(y-.5)*CELL,b=(y+.5)*CELL;
-  const ground=zone==='road'?path:zone==='village'?cobble:floor;quad(ground,[l,0,t],[r,0,t],[r,0,b],[l,0,b],[0,1,0]);
+  if(regionWall(zone,x,y)&&!(zone==='village'&&VILLAGE_DETAILS.some(([px,py])=>px===x&&py===y)))continue;const l=(x-.5)*CELL,r=(x+.5)*CELL,t=(y-.5)*CELL,b=(y+.5)*CELL;
+  const ground=zone==='road'?path:zone==='village'?cobble:floor;if(zone!=='road'&&!(zone==='village'&&x===20&&y===8))quad(ground,[l,0,t],[r,0,t],[r,0,b],[l,0,b],[0,1,0]);
   if(!w.outdoor){quad(stone,[l,w.ceiling,b],[r,w.ceiling,b],[r,w.ceiling,t],[l,w.ceiling,t],[0,-1,0]);for(const[dx,dy]of [[0,-1],[0,1],[-1,0],[1,0]]){
    if(!regionWall(zone,x+dx,y+dy))continue;
    // Glassworks machinery is freestanding; only the exterior boundary has walls.
@@ -23,43 +28,60 @@ export function regionGeometry(zone:Zone){const w=REGION_WORLDS[zone],groups={}a
   }}
  }
  if(zone==='village'){
-  for(const b of w.buildings){const x=(b.x+(b.w-1)/2)*CELL,z=(b.y+(b.d-1)/2)*CELL,bw=b.w*CELL,bd=b.d*CELL;box(stone,x,0,z,bw,.45,bd);box(plaster,x,.45,z,bw,b.h-.45,bd);
+  for(const b of w.buildings){const x=(b.x+(b.w-1)/2)*CELL,z=(b.y+(b.d-1)/2)*CELL,bw=b.w*CELL,bd=b.d*CELL;box(fieldstone,x,0,z,bw,.45,bd);box(plaster,x,.45,z,bw,b.h-.45,bd);
    // Pitched roofs with timber ridges and triangular gables.
    const a=x-bw/2-.4,c=x+bw/2+.4,n=z-bd/2-.4,s=z+bd/2+.4,h=b.h,top=h+b.roof;
    quad(roof,[a,h,n],[c,h,n],[c,top,z],[a,top,z],[0,.7,-.7],[0,0,b.w,2]);quad(roof,[c,h,s],[a,h,s],[a,top,z],[c,top,z],[0,.7,.7],[0,0,b.w,2]);quad(plaster,[a,h,s],[a,h,n],[a,top,z],[a,top,z],[-1,0,0]);quad(plaster,[c,h,n],[c,h,s],[c,top,z],[c,top,z],[1,0,0]);box(wood,x,top-.08,z,bw+.9,.18,.2);
-   for(const side of [-1,1]){const edge=z+side*(bd/2+.035);box(wood,x,.55,edge,bw,.16,.13);box(wood,x,b.h-.2,edge,bw,.2,.13);for(let j=0;j<=b.w;j++)box(wood,x-bw/2+j*CELL,.4,edge,.17,b.h-.3,.15);for(let j=0;j<b.w;j++){if(j===Math.floor(b.w/2))continue;const wx=x-bw/2+(j+.5)*CELL;box(wood,wx,1.4,edge+side*.06,1.12,1.35,.1);box(glass,wx,1.5,edge+side*.13,.88,1.1,.04);box(wood,wx,1.5,edge+side*.17,.055,1.1,.05);box(wood,wx,2.02,edge+side*.17,.9,.06,.05);}
-    box(wood,x,.03,edge+side*.08,1.35,2.35,.12);box(metal,x+.44,1,edge+side*.16,.09,.15,.05);box(stone,x,0,edge+side*.4,1.8,.16,.8);
+   for(const side of [-1,1]){const edge=z+side*(bd/2+.035);box(wood,x,.55,edge,bw,.16,.13);box(wood,x,b.h-.2,edge,bw,.2,.13);for(let j=0;j<=b.w;j++)box(wood,x-bw/2+j*CELL,.4,edge,.17,b.h-.3,.15);for(let j=0;j<b.w;j++){if(j===Math.floor(b.w/2))continue;const wx=x-bw/2+(j+.5)*CELL;box(wood,wx,1.4,edge+side*.06,1.12,1.35,.1);box(glass,wx,1.5,edge+side*.13,.88,1.1,.04);box(wood,wx,1.5,edge+side*.17,.055,1.1,.05);box(wood,wx,2.02,edge+side*.17,.9,.06,.05);for(const slope of [-1,1])for(let k=-2;k<=2;k++){const line=k*.3,v1=(-.43-line)/slope,v2=(.43-line)/slope,a=Math.max(-.52,Math.min(v1,v2)),b=Math.min(.52,Math.max(v1,v2));if(b<=a)continue;const x1=wx+slope*a+line,x2=wx+slope*b+line;if(Math.abs(x1-wx)>.46||Math.abs(x2-wx)>.46)continue;const zz=edge+side*.18;quad(metal,[x1-.009,2.05+a,zz],[x1+.009,2.05+a,zz],[x2+.009,2.05+b,zz],[x2-.009,2.05+b,zz],[0,0,side]);}}
+    box(wood,x,.03,edge+side*.08,1.35,2.35,.12);box(metal,x+.44,1,edge+side*.16,.09,.15,.05);box(fieldstone,x,0,edge+side*.4,1.8,.16,.8);
    }for(const side of [-1,1]){const edge=x+side*(bw/2+.045);box(wood,edge,.5,z,.16,.15,bd);box(wood,edge,b.h-.2,z,.16,.18,bd);for(let j=0;j<=b.d;j++)box(wood,edge,.45,z-bd/2+j*CELL,.16,b.h-.45,.18);for(const sz of [-1,1]){box(wood,edge+side*.035,1.35,z+sz*bd*.24,.08,1.4,1.15);box(glass,edge+side*.09,1.5,z+sz*bd*.24,.035,1.1,.88);box(wood,edge+side*.13,1.5,z+sz*bd*.24,.04,1.1,.055);}}
-   box(stone,x+bw*.33,b.h,z-bd*.24,.8,b.roof+1,.8);quad(shadow,[x-bw/2,.012,z+bd/2],[x+bw/2,.012,z+bd/2],[x+bw/2+2,.012,z+bd/2+3],[x-bw/2+2,.012,z+bd/2+3],[0,1,0]);
+   const chx=x+bw*.33,chz=z-bd*.24,ch=b.roof+1;for(const side of [-1,1]){box(brick,chx+side*.3,b.h,chz,.18,ch,.8);box(brick,chx,b.h,chz+side*.3,.45,ch,.18);box(brick,chx+side*.35,b.h+ch-.08,chz,.24,.18,1);box(brick,chx,b.h+ch-.08,chz+side*.35,.5,.18,.24);}box(wood,chx,b.h+ch-.25,chz,.42,.02,.42);quad(shadow,[x-bw/2,.012,z+bd/2],[x+bw/2,.012,z+bd/2],[x+bw/2+2,.012,z+bd/2+3],[x-bw/2+2,.012,z+bd/2+3],[0,1,0]);
   }
-  // Visible forest beyond the village gate makes the next place legible before crossing it.
-  quad(path,[24*CELL+.1,0,9*CELL],[39*CELL,0,9*CELL],[39*CELL,0,11*CELL],[24*CELL+.1,0,11*CELL],[0,1,0],[0,0,12,1]);for(let x=26;x<40;x+=2)for(const side of [-1,1])pine(leaf,wood,shadow,x*CELL,10*CELL+side*(4+Math.sin(x)*.4),6.5+Math.sin(x*4),x+side);
-  // Village enclosure and gateposts leave an actual opening in the east wall.
-  for(let x=0;x<width;x++){box(stone,x*CELL,0,0,CELL,2.1,.65);box(stone,x*CELL,0,(height-1)*CELL,CELL,2.1,.65);}for(let y=1;y<height-1;y++){box(stone,0,0,y*CELL,.65,2.1,CELL);if(y!==10)box(stone,24*CELL,0,y*CELL,.65,2.1,CELL);}
-  for(const side of [-1,1]){box(stone,24*CELL,0,(10+side*.66)*CELL,1.1,3.7,.9);box(metal,24*CELL,3.5,(10+side*.66)*CELL,1.25,.2,1.1);}box(wood,24*CELL,3.4,10*CELL,.5,.35,4);
-  // Fountain landmark: concentric raised stone basins, water and a central glass shard.
-  const fx=12*CELL,fz=10*CELL;box(stone,fx,0,fz,2.1,.27,2.1);for(const side of [-1,1]){box(stone,fx+side*.94,.2,fz,.18,.5,2);box(stone,fx,.2,fz+side*.94,2,.5,.18);}box(water,fx,.38,fz,1.7,.03,1.7);box(stone,fx,.3,fz,.5,.9,.5);cone(water,fx,fz,1.1,.32,1.5,5);
+  // Continuous enclosure with coping and buttresses. The gate is the only interruption.
+  const maxX=(width-1)*CELL,maxZ=(height-1)*CELL,gz=8*CELL;
+  for(const z of [0,maxZ]){box(fieldstone,maxX/2,0,z,maxX+.65,2.05,.62);box(fieldstone,maxX/2,2.05,z,maxX+.85,.18,.86);}
+  box(fieldstone,0,0,maxZ/2,.62,2.05,maxZ);box(fieldstone,0,2.05,maxZ/2,.86,.18,maxZ);
+  for(const[a,b]of [[0,gz-CELL/2],[gz+CELL/2,maxZ]]){box(fieldstone,maxX,0,(a+b)/2,.62,2.05,b-a);box(fieldstone,maxX,2.05,(a+b)/2,.86,.18,b-a);}
+  for(const x of [0,maxX])for(const z of [0,maxZ])cylinder(fieldstone,x,z,0,.54,2.35,10);
+  for(const side of [-1,1]){const z=gz+side*(CELL/2+.2);box(fieldstone,maxX,0,z,1,3.35,.7);box(fieldstone,maxX,3.35,z,1.12,.18,.86);}box(wood,maxX,3.25,gz,.45,.3,3.8);
+  fountain(cutstone,water);
+  for(const tx of [8,12]){const x=tx*CELL,z=8*CELL;ring(fieldstone,x,z,.02,.71,.56,.36);cylinder(grass,x,z,.06,.56,.12);for(let j=0;j<7;j++){const a=j*Math.PI*2/7,cx=x+Math.cos(a)*.31,cz=z+Math.sin(a)*.31;for(let k=0;k<10;k++){const u=k*Math.PI/5,v=(k+1)*Math.PI/5;quad(leaf,[cx+Math.cos(u)*.25,.25,cz+Math.sin(u)*.25],[cx+Math.cos(v)*.25,.25,cz+Math.sin(v)*.25],[cx+Math.cos(v)*.19,.68+j%3*.07,cz+Math.sin(v)*.19],[cx+Math.cos(u)*.19,.68+j%3*.07,cz+Math.sin(u)*.19],[Math.cos(u),.5,Math.sin(u)]);quad(leaf,[cx,.88,cz],[cx+Math.cos(u)*.19,.68+j%3*.07,cz+Math.sin(u)*.19],[cx+Math.cos(v)*.19,.68+j%3*.07,cz+Math.sin(v)*.19],[cx,.88,cz],[0,1,0]);}}}
+  for(const tx of [7,13]){const x=tx*CELL,z=9*CELL;for(let j=0;j<3;j++)box(wood,x,.48,z+(j-1)*.18,1.9,.1,.15);box(wood,x,.85,z+.33,1.9,.35,.09);for(const side of [-1,1]){box(metal,x+side*.72,.02,z,.1,.5,.55);box(metal,x+side*.72,.48,z+.33,.08,.8,.08);}}
+
+  for(const b of w.buildings){const cx=(b.x+(b.w-1)/2)*CELL,cz=(b.y+(b.d-1)/2)*CELL,bw=b.w*CELL,bd=b.d*CELL;
+   if(b.kind!=='tower')for(const side of [-1,1]){const fz=cz+side*(bd*.5+.06);box(wood,cx,2.95,fz,bw,.2,.18);for(const edge of [-1,1]){const wx=cx+edge*CELL;box(wood,wx,3.25,fz+side*.04,1.18,1.15,.1);box(glass,wx,3.35,fz+side*.1,.92,.92,.045);box(wood,wx,3.22,fz+side*.12,1.35,.12,.34);}
+    const fx=cx+side*(bw*.5+.06);box(wood,fx,2.95,cz,.18,.2,bd);for(const edge of [-1,1]){const wz=cz+edge*bd*.24;box(wood,fx+side*.04,3.25,wz,.1,1.15,1.18);box(glass,fx+side*.1,3.35,wz,.045,.92,.92);}}
+   // Raised lintels, carved corbels, window sills and shutters cast real geometric shadows.
+   const front=cz+bd/2+.08;for(const side of [-1,1]){box(fieldstone,cx+side*.78,0,front,.2,2.45,.32);box(fieldstone,cx+side*.78,2.2,front,.36,.2,.42);}box(fieldstone,cx,2.4,front,1.9,.23,.45);
+   for(const side of [-1,1]){const wx=cx+side*CELL;box(wood,wx,1.34,front,1.4,.12,.45);for(const edge of [-1,1])box(wood,wx+edge*.65,1.4,front,.24,1.25,.16);}
+
+   if(b.kind==='inn'||b.kind==='shop'){hangingEmblem(wood,metal,cx+1.85,front+.48,b.kind==='shop');box(metal,cx-1.1,2.45,front+.2,.06,.06,.5);box(ember,cx-1.1,1.99,front+.42,.21,.32,.21);for(const side of [-1,1]){box(metal,cx-1.1+side*.14,1.94,front+.42,.035,.44,.3);box(metal,cx-1.1,1.94,front+.42+side*.14,.3,.44,.035);}cone(metal,cx-1.1,front+.42,2.35,.24,.19,6);}
+   cylinder(wood,cx-bw*.5+.4,cz+bd*.5+.26,0,.32,.67,12);for(const y of [.12,.53])ring(metal,cx-bw*.5+.4,cz+bd*.5+.26,y,.34,.3,.05);
+  }
  }
  if(zone==='road'){
-  for(let y=-3;y<height+3;y++)for(let x=-3;x<width+3;x++){
-   if(!regionWall(zone,x,y)||x===-1&&Math.abs(y-10)<2||x>23&&Math.abs(y-6)<2)continue;const jitter=Math.sin(x*73+y*19),tx=x*CELL+jitter*.65,tz=y*CELL+Math.sin(y*17+x)*.65,h=6.4+2*Math.sin(x*5+y*8);pine(leaf,wood,shadow,tx,tz,h,x*31+y*7);
-  }
+  quad(path,[-CELL/2,0,-CELL/2],[(width-.5)*CELL,0,-CELL/2],[(width-.5)*CELL,0,(height-.5)*CELL],[-CELL/2,0,(height-.5)*CELL],[0,1,0],[0,0,width,height]);
+  for(const t of forestTrees())pine(leaf,wood,shadow,t.x,t.z,t.height,t.seed);
+  for(let y=0;y<height;y+=.21)for(let x=0;x<width;x+=.23){const tx=x+.045*Math.sin(y*57+x*9),tz=y+.045*Math.sin(x*31),cover=trailCoverage(tx,tz);if(cover<.03||cover>.36)continue;const px=tx*CELL,pz=tz*CELL,h=.12+.14*(.5+.5*Math.sin(x*53+y*19));for(let k=0;k<3;k++){const a=k*Math.PI/3,s=Math.sin(a)*.035,c=Math.cos(a)*.035;quad(leaf,[px-s,.01,pz-c],[px+s,.01,pz+c],[px+.05*Math.sin(x),h,pz+.04*Math.cos(y)],[px+.05*Math.sin(x),h,pz+.04*Math.cos(y)],[Math.sin(a),.3,Math.cos(a)]);}}
   // The glassworks is visible at the end of the forest, well before the entrance.
   const ex=26*CELL,ez=6*CELL;box(stone,ex,0,ez,8,7.4,15);box(roof,ex,7.4,ez,8.8,.45,16);for(const z of [-5,5]){box(metal,ex+1,7.7,ez+z,1.5,8,1.5);for(let k=0;k<3;k++)box(metal,ex+1,9+k*2,ez+z,1.7,.16,1.7);}box(wood,24*CELL+.12,0,ez,.1,3.2,2.3);for(const z of [-4,4])box(glass,24.43*CELL,3.9,ez+z,.05,2.3,2.1);
  }
  if(zone==='glassworks'){
-  for(const[x,y,bw,bd]of [[3,4,4,4],[16,4,4,4],[3,12,4,3],[17,12,3,3]]){const cx=(x+(bw-1)/2)*CELL,cz=(y+(bd-1)/2)*CELL;box(stone,cx,0,cz,bw*CELL,1.1,bd*CELL);box(stone,cx,1.1,cz,bw*CELL-.6,2.8,bd*CELL-.6);cone(stone,cx,cz,3.9,bw*CELL*.5,1.5,12);box(metal,cx,4.3,cz,1.1,2.2,1.1);for(const side of [-1,1]){box(wood,cx,.35,cz+side*bd*CELL/2,2.9,2.5,.2);box(glass,cx,.58,cz+side*(bd*CELL/2+.13),2.4,1.8,.04);for(let k=-2;k<=2;k++)box(metal,cx+k*.45,.5,cz+side*(bd*CELL/2+.19),.08,2.1,.05);}}
+  for(const[x,y,bw,bd]of [[3,4,4,4],[16,4,4,4],[3,12,4,3],[17,12,3,3]]){const cx=(x+(bw-1)/2)*CELL,cz=(y+(bd-1)/2)*CELL;box(stone,cx,0,cz,bw*CELL,1.1,bd*CELL);box(stone,cx,1.1,cz,bw*CELL-.6,2.8,bd*CELL-.6);cone(stone,cx,cz,3.9,bw*CELL*.5,1.5,12);box(metal,cx,4.3,cz,1.1,2.2,1.1);for(const side of [-1,1]){box(wood,cx,.35,cz+side*bd*CELL/2,2.9,2.5,.2);box(ember,cx,.58,cz+side*(bd*CELL/2+.13),2.4,1.8,.04);for(let k=-2;k<=2;k++)box(metal,cx+k*.45,.5,cz+side*(bd*CELL/2+.19),.08,2.1,.05);}}
   for(const[x,y]of [[9,5],[13,5],[9,12],[13,12]]){box(stone,x*CELL,0,y*CELL,1.8,.4,1.8);box(metal,x*CELL,.4,y*CELL,.62,6.1,.62);box(metal,x*CELL,5.9,y*CELL,1.3,.5,1.3);}
-  for(const x of [4,9,14,19]){box(metal,x*CELL,5.9,9*CELL,.22,.25,18*CELL);for(const z of [0,18]){box(wood,x*CELL,2.4,z*CELL+(z===0?.04:-.04),3,3.2,.08);box(water,x*CELL,2.6,z*CELL+(z===0?.1:-.1),2.7,2.85,.04);box(metal,x*CELL,2.6,z*CELL+(z===0?.15:-.15),.13,2.85,.06);}}
+  for(const x of [4,9,14,19]){box(metal,x*CELL,5.9,9*CELL,.22,.25,18*CELL);for(const z of [0,18]){box(wood,x*CELL,2.4,z*CELL+(z===0?.04:-.04),3,3.2,.08);box(coolglass,x*CELL,2.6,z*CELL+(z===0?.1:-.1),2.7,2.85,.04);box(metal,x*CELL,2.6,z*CELL+(z===0?.15:-.15),.13,2.85,.06);}}
  }
  if(zone==='crypts'){
   // Structural pillars frame the large chamber without partitioning it into corridors.
   for(const[x,y]of [[11,10],[15,10],[11,12],[15,12]]){box(stone,x*CELL-.9,0,y*CELL-.9,.48,w.ceiling,.48);box(metal,x*CELL-.9,3.8,y*CELL-.9,.7,.25,.7);}
  }
  // Physical lintels and stair treads distinguish exits from blank walls.
- for(const p of w.passages){const x=p.x*CELL,z=p.y*CELL,stair=p.id.includes('stairs')||p.id==='crypt-return',alongX=p.x===0||p.x===width-1;
-  for(const side of [-1,1])box(stone,x+(alongX?0:side*1.15),0,z+(alongX?side*1.15:0),alongX?.45:.3,3.15,alongX?.3:.45);box(stone,x,3.05,z,alongX?.5:2.6,.3,alongX?2.6:.5);
-  if(stair){for(let k=0;k<7;k++)box(stone,x,.025+k*.075,z+(k-3)*.29,1.85,.08,.31);for(const side of [-1,1])box(metal,x+side*1.02,.35,z,.08,.8,2.3);}
+ for(const p of w.passages){if(p.id==='pine-gate'||p.id==='village-return')continue;const x=p.id==='crypt-return'?.28*CELL:p.x*CELL,z=p.y*CELL,stair=p.id.includes('stairs')||p.id==='crypt-return',alongX=p.id==='crypt-return'||p.x===0||p.x===width-1;
+  for(const side of [-1,1])box(stone,x+(alongX?0:side*1.15),0,z+(alongX?side*1.15:0),alongX?.35:.25,3.15,alongX?.25:.35);box(stone,x,3.05,z,alongX?.35:2.6,.23,alongX?2.6:.35);
+  if(stair){for(let k=0;k<7;k++)box(stone,x+(alongX?(k-3)*.29:0),.025+k*.075,z+(alongX?0:(k-3)*.29),alongX?.31:1.85,.08,alongX?1.85:.31);
+   // Open handrails, with separated posts rather than opaque bronze slabs.
+   for(const side of [-1,1]){for(const step of [-1,1])box(metal,x+(alongX?step*.82:side*1.02),.05,z+(alongX?side*1.02:step*.82),.045,.74,.045);box(metal,x+(alongX?0:side*1.02),.76,z+(alongX?side*1.02:0),alongX?1.8:.05,.045,alongX?.05:1.8);}}
  }
+
  return groups;
 }

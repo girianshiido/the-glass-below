@@ -11,13 +11,14 @@ Kael reaches Greyhaven with a letter he does not remember receiving. The village
 - An illustrated title screen with **New Game**, **Continue** and **Settings**.
 - Kael begins alone. Elara's road commission opens the glassworks investigation; Lys joins through dialogue after the furnace encounter.
 - Greyhaven includes Elder Elara, Mara's inn and Tovin's provisions. Dialogue and a journal track the chapter through its final report.
-- Greyhaven, Old Pine Road, the glassworks and the crypts form a connected journey. All four regions use first-person 3D exploration, with distant scenery, broad village squares, forest clearings and large furnace and crypt halls. The eastern village gate opens visibly; doors and stairs connect the regions on foot. The regional map is an orientation aid, without fast travel.
-- Elara, Mara, Tovin and Lys appear as illustrated full-body characters in the 3D world. Kael and Lys have original portraits in the party interface. Ordinary services open through nearby conversations.
+- Greyhaven, Old Pine Road, the glassworks and the crypts form a connected journey. All four regions use first-person 3D exploration, with distant scenery, broad village squares, forest clearings and large furnace and crypt halls. The compact village has a circular fountain with animated water, benches, planters, textured masonry, glazed windows, brick chimneys and small hanging pictograms. Low mist drifts through the outdoor scene. The trail has soft, uneven earth/grass banks, and tree canopies stay clear of the walkable path. Exterior lighting is fixed in the world; it does not follow the camera. The eastern village gate opens visibly; village and road share one outdoor scene, so walking through the gate has no fade or camera jump. Doors and stairs connect the remaining regions on foot. The regional map is an orientation aid, without fast travel.
+- Elara and Lys appear as illustrated full-body characters in the 3D world. Mara and Tovin remain inside their inn and shop: walk forward at their doors to open original illustrated interiors with service menus. Leaving returns to the same doorstep. Kael and Lys have portraits in the party interface.
 - Shared party XP and levels up to 20. Stats and skill power increase with level; Lys joins at the party's current level. Level-ups fully restore the active party.
 - Buy a tempered weapon, protective leather or a frostglass charm. Their attack, HP, defence and spell bonuses are applied in combat. Healing tonics restore 80 HP; the inn restores the party for 5 shards.
 - Automatic attacks, manual Fracture, Frost Shard and Mending Seal; tactical pause queues one order per hero, with ×1 / ×2 speed. Spell costs and current power are visible in their descriptions.
+- Compact responsive skill buttons show icons, names and MP costs; detailed descriptions and shortcuts remain in tooltips and the party sheet.
 - Animated blade strokes, impact ripples, a gathering frost sigil with converging shards, and healing rings with rising motes. Effects freeze with tactical pause and respect reduced motion.
-- Six original music loops: title, village, road, crypt exploration, battle and boss. All are rendered with **FluidSynth + MuseScore General HQ**, stereo 48 kHz, in **OGG and AAC**. Eleven sound effects, independent volume levels, global mute and background suspension remain supported.
+- Six original music loops: title, village, road, crypt exploration, battle and boss. All are rendered with **FluidSynth + MuseScore General HQ**, stereo 48 kHz, in **OGG and AAC**. Sixteen sound effects, including six soft, alternating stone/earth footsteps, independent volume levels, global mute and background suspension remain supported.
 - A permanent **Check for updates** menu button. A downloaded version is activated only through **Apply update**.
 
 ### Start or resume
@@ -26,7 +27,9 @@ Choose **New Game** to begin the new story. **Continue** preserves existing save
 
 The chapter has a complete quest route: clear the road, optionally report to Elara, investigate the furnace, recruit Lys, recover the copper key, open the crypt gate, defeat the Warden and return the memory prism to Greyhaven. The region remains explorable after the ending.
 
-![Greyhaven in 3D](docs/world-greyhaven.jpg)
+![Greyhaven revised](docs/village-revised.jpg)
+
+![Inside the shop](docs/shop-interior.jpg)
 
 ![Inside the glassworks](docs/world-glassworks.jpg)
 
@@ -46,7 +49,7 @@ Cleared sectors can repopulate after **20 seconds of active play outside the sec
 | Pause / resume combat | Space |
 | Fracture / Frost Shard / Mending Seal | 1 / 2 / 3 |
 
-The outdoor road follows a defined path through the forest. Walk through the eastern village gate to reach the road, enter the distant glassworks facade, and find the marked stairs in the north-east corner of its great hall. The entrance stairs provide a return route; the Warden chamber has another staircase. The Region button provides an overview. Retreat preserves HP/MP and resets undefeated opponents. Combat saves resume at the encounter checkpoint rather than mid-animation.
+The outdoor road is a narrow path with small clearings. Visible monsters engage within reach even from the side, so the road encounters cannot be bypassed. Engaged creatures visibly approach melee distance; impacts and framing follow the approach. There are no invisible random encounters. Walk through the eastern village gate to reach the road, enter the distant glassworks facade, and find the stairs in the north-east corner of its great hall. Ten visible, animated wall torches light the darker crypt. Open handrails leave the entry view clear. The entrance stairs provide a return route; the Warden chamber has another staircase. The Region button provides an overview. Retreat preserves HP/MP and resets undefeated opponents. Combat saves resume at the encounter checkpoint rather than mid-animation.
 
 ## Development
 
@@ -59,7 +62,7 @@ pnpm test
 pnpm build
 ```
 
-The build checks TypeScript, produces `dist/`, builds the versioned offline cache and packages `release/The-Glass-Below.html`. The standalone HTML embeds the environment illustrations, creatures and both audio codecs. Installation as a PWA requires HTTPS. Browser storage is versioned and existing prototype saves remain compatible. Chapter 1.0 saves migrate to valid positions in the expanded regions, preserving progression, equipment and health.
+The build checks TypeScript, produces `dist/`, builds the versioned offline cache and packages `release/The-Glass-Below.html`. The standalone HTML embeds the environment illustrations, creatures and both audio codecs. Installation as a PWA requires HTTPS. Browser storage is versioned and existing prototype saves remain compatible. Saves from chapters 1.0 and 2.0 migrate to valid positions in the revised village and narrow woodland trail, preserving progression, equipment and health.
 
 - `src/campaign.ts`: chapter state, XP, equipment, quests, travel and outdoor patrol rules.
 - `src/chapter-ui.ts` and `src/chapter.css`: dialogue, region map, journal and party UI.
@@ -72,7 +75,7 @@ The build checks TypeScript, produces `dist/`, builds the versioned offline cach
 
 ### Music authoring
 
-Editable MIDI scores and render reports are in `music/`. Run `python3 scripts/render-soundfont.py` with numpy, FluidSynth, ffmpeg and a local General MIDI bank. Set `GLASS_SOUNDFONT` to choose another bank; the default is the local MuseScore General HQ used in the neighbouring projects. `GLASS_TRACKS=title,village,road` renders only those scores. The SoundFont itself is not part of the repository. The renderer checks for overlapping notes, renders three passes, extracts a settled loop, bridges the seam and checks decoded OGG/AAC peaks. `public/audio/manifest.json` records sample rates, durations and levels. The original sound-effect synthesis remains in `scripts/compose-audio.py`.
+Editable MIDI scores and render reports are in `music/`. Run `python3 scripts/render-soundfont.py` with numpy, FluidSynth, ffmpeg and a local General MIDI bank. Set `GLASS_SOUNDFONT` to choose another bank; the default is the local MuseScore General HQ used in the neighbouring projects. `GLASS_TRACKS=title,village,road` renders only those scores. The SoundFont itself is not part of the repository. The renderer checks for overlapping notes, renders three passes, extracts a settled loop, bridges the seam and checks decoded OGG/AAC peaks. `public/audio/manifest.json` records sample rates, durations and levels. The original sound-effect synthesis remains in `scripts/compose-audio.py`. `python3 scripts/render-footsteps.py` renders only the six softer heel-to-toe footsteps, preserving every music master.
 
 ## Verification and deployment
 

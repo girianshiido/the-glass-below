@@ -27,3 +27,5 @@ export function projectCreatureCenter(kind:CreatureKind,width:number,height:numb
   const layout=creatureLayout(kind,width,height,depth,insets),frame=creatureFrame(kind,0),focal=height/(2*Math.tan(VERTICAL_FOV/2));
   return{x:50+right/Math.max(.7,depth)*focal/Math.max(1,width)*100,y:(layout.bottom-frame.height*layout.scale*.5/Math.max(.7,depth)*focal)/Math.max(1,height)*100};
 }
+/** A detected creature closes to melee range, with no change to the exploration checkpoint. */
+export function battlePosition(player:{x:number;y:number},site:{x:number;y:number},time:number){const dx=site.x-player.x,dy=site.y-player.y,distance=Math.hypot(dx,dy);if(distance<1e-6)return{...site};const near=Math.min(distance,1.95/2.6),t=Math.max(0,Math.min(1,time/.55)),ease=t*t*(3-2*t),ratio=1+(near/distance-1)*ease;return{x:player.x+dx*ratio,y:player.y+dy*ratio};}

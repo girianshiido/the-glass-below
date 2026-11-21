@@ -1,4 +1,4 @@
-import {regionOf,regionWall,regionSight,nearbyPassage,passageLocked,passageHint,regionEncounter,revealRegion} from './region-world.ts';
+import {regionOf,regionWall,regionSight,nearbyPassage,passageLocked,passageHint,regionEncounter,revealRegion,roadThreat} from './region-world.ts';
 import {activeHero,campaignVictory,updateRoadRespawns,CAMPAIGN_ENCOUNTERS,crossPassage} from './campaign.ts';
 import type {Campaign} from './campaign.ts';
 import {ENCOUNTERS,START,CHEST,GATE,SHRINE,EXIT,DIRECTIONS,wall,same,reveal,lineOfSight} from './world.ts';
@@ -63,10 +63,10 @@ export function move(g:Game,relative:number){
   if(encounter){g.direction=direction;beginBattle(g,encounter);return false;}
   g.position=next;if(g.campaign)revealRegion(g);else reveal(g.seen,next,g.gateOpen);g.message=locationHint(g);
   if(!g.campaign&&same(next,EXIT)&&g.cleared.has('guardian')){g.phase=g.campaign?'explore':'complete';g.message='Silence returns to the Glass Crypts.';return true;}
-  const ahead=encounterAhead(g);if(ahead)beginBattle(g,ahead);
+  const ahead=roadThreat(g)??encounterAhead(g);if(ahead){faceThreat(g,ahead);beginBattle(g,ahead);}
   return true;
 }
-export function turn(g:Game,delta:number){if(g.phase!=='explore')return;g.direction=(g.direction+delta+4)%4;if(g.campaign)revealRegion(g);else reveal(g.seen,g.position,g.gateOpen);g.message=locationHint(g);const e=encounterAhead(g);if(e)beginBattle(g,e);}
+export function turn(g:Game,delta:number){if(g.phase!=='explore')return;g.direction=(g.direction+delta+4)%4;if(g.campaign)revealRegion(g);else reveal(g.seen,g.position,g.gateOpen);g.message=locationHint(g);const e=roadThreat(g)??encounterAhead(g);if(e){faceThreat(g,e);beginBattle(g,e);}}
 export function locationHint(g:Game){
   if(g.campaign){const p=nearbyPassage(g);if(p)return passageHint(g,p);if(g.campaign.zone!=='crypts')return'';}
   if(same(g.position,CHEST)&&!g.chestOpen)return'Interact to open the chest.';
@@ -165,3 +165,5 @@ export function continueAfterBattle(g:Game){if(g.phase!=='victory')return;g.phas
 export function retreat(g:Game){if(g.phase!=='combat')return;g.phase='explore';g.battle=null;g.feedback=[];g.position=g.campaign?{...regionOf(g).spawn}:{...START};g.direction=g.campaign?regionOf(g).direction:0;g.message='Back at the entrance. Undefeated enemies have recovered.';}
 
 export function encounterDefinition(id:string){return regionEncounter(id)??[...ENCOUNTERS,...CAMPAIGN_ENCOUNTERS].find(e=>e.id===id);}
+
+function faceThreat(g:Game,e:EncounterDef){if(g.campaign?.zone!=='road')return;const dx=e.x-g.position.x,dy=e.y-g.position.y;g.direction=Math.abs(dx)>=Math.abs(dy)?dx>=0?0:2:dy>=0?1:3;}

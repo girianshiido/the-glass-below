@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {CREATURE_FRAMES,ATLAS_SIZE} from '../src/creature-frames.ts';
-import {creatureFrame,creatureLayout,VERTICAL_FOV,CAMERA_HEIGHT} from '../src/combat-view.ts';
+import {creatureFrame,creatureLayout,battlePosition,VERTICAL_FOV,CAMERA_HEIGHT} from '../src/combat-view.ts';
 import {effectFor} from '../src/effects.ts';
 import {drawThinImpact} from '../src/impact-art.ts';
 
@@ -17,7 +17,7 @@ test('Each of the fifteen source rectangles is isolated from every neighbouring 
 });
 test('Every pose stays above the enemy dock and below the toolbar, at full opponent size',()=>{
  const insets={top:68,bottom:92};
- for(const kind of ['scavenger','wraith','sentinel'])for(const[width,height]of [[320,220],[375,292],[375,409],[457,320],[1220,1322],[1280,607],[1920,875]])for(const depth of [2.35,2.6]){
+ for(const kind of ['scavenger','wraith','sentinel'])for(const[width,height]of [[320,220],[375,292],[375,409],[457,320],[1220,1322],[1280,607],[1920,875]])for(const depth of [1.73,1.95,2.35,2.6]){
   const layout=creatureLayout(kind,width,height,depth,insets),focal=height/(2*Math.tan(VERTICAL_FOV/2));
   const ground=height*.5+CAMERA_HEIGHT/depth*focal+layout.shiftY*height*.5;
   assert(Math.abs(ground-layout.bottom)<1e-8);
@@ -42,3 +42,5 @@ test('Blade art uses thin strokes and small sparks without a filled impact cloud
  for(let variant=0;variant<4;variant++)drawThinImpact(c,variant,.25,160,'hit');
  assert(widths.length>20);assert(Math.max(...widths)<=2.6);assert(Math.max(...radii)<=2);assert(new Set(curves.map(v=>JSON.stringify(v))).size>=4);
 });
+
+test('Detected enemies visibly approach melee distance without moving the player checkpoint',()=>{const player={x:4,y:10},site={x:6,y:10};assert.deepEqual(battlePosition(player,site,0),site);const middle=battlePosition(player,site,.275),near=battlePosition(player,site,.55);assert(middle.x<site.x&&middle.x>near.x);assert(Math.abs(Math.hypot(near.x-player.x,near.y-player.y)*2.6-1.95)<1e-8);assert.deepEqual(battlePosition(player,site,20),near);assert.deepEqual(player,{x:4,y:10});});
