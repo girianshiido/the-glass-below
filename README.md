@@ -1,33 +1,49 @@
 # The Glass Below
 
-An original first-person dungeon RPG for phones, tablets and desktop browsers. TypeScript strict mode, Vite and a small WebGL renderer; no game server, account or telemetry.
-
-## Prototype 0.8
-
-Explore the Glass Crypts, find the copper key, unlock the eastern gate and defeat the Faceless Warden. The hand-built level includes alternative paths, six encounters, a chest, a restorative spring and a final exit. Illustrated creatures stand inside a true 3D environment and are hidden correctly by walls.
-
-Kael and Lys attack automatically. Fracture, Frost Shard and Mending Seal remain manual. Tactical pause freezes combat and lets you queue one skill per hero. Interrupts, freezing and combat speed ×1 / ×2 are supported. Every encounter contains exactly one full-size opponent. Defeating it clears the passage. Three cleared corridors may later receive a returning patrol; these are separate encounters after a four-minute cooldown, never an immediate replacement.
-
-- Three original illustrated creatures, five poses each; their artwork is unchanged.
-- Detailed procedural stone, inset floor medallions, projecting plinths and cornices, vault ribs, bronze fittings, animated flame sconces and warm torch lighting against cool shadows.
-- Patinated-metal controls, framed minimap and polished combat cards.
-- A permanent **Check for updates** menu button reports current, available, offline and error states; activation remains an explicit **Apply update** action.
-- Four thin blade-stroke variants, enlarged by 60% with longer visibility and small sparks, plus distinct ice, healing, fracture and enemy-hit effects.
-- Individually cropped creature poses and combat framing that keeps the current opponent above a compact enemy-information dock.
-- Animated spell particles, damage numbers, hit reactions and camera feedback.
-- Eleven original sound effects and three original looping scores: exploration, combat and boss, rendered with FluidSynth and MuseScore General HQ in stereo 48 kHz.
-- Global mute, independent music/effect levels, background suspension and iOS-friendly OGG/AAC fallback.
-- Fully English interface; level title fades after entry, other notices expire, objectives live in the map/menu.
-- Portrait and landscape phone layouts with touch targets of at least 44 px, plus wide tablet/desktop layouts.
-- Local versioned saves, validated export/import, and offline PWA after the first complete online visit.
-
-The working title is independent of Hollow Oath. Hollow Oath informed the illustrated style and combat rhythm; Dinosaur Resurrection informed only the exploration perspective. No artwork or music from either game is included.
-
-## Play
+An original English-language RPG for phones, tablets and desktop browsers. Strict TypeScript, Vite, WebGL and Canvas 2D. No accounts or game server.
 
 [Play The Glass Below](https://girianshiido.github.io/the-glass-below/)
 
-For a self-contained offline copy, open `release/The-Glass-Below.html` in a recent browser. It embeds the artwork and both audio codecs. Sound starts after a user gesture. Installation as a PWA requires an HTTPS deployment.
+## Chapter I — The Borrowed Light · 1.0
+
+Kael reaches Greyhaven with a letter he does not remember receiving. The village is losing its memories; the abandoned glassworks may be keeping them.
+
+- An illustrated title screen with **New Game**, **Continue** and **Settings**.
+- Kael begins alone. Elara's road commission opens the glassworks investigation; Lys joins through dialogue after the furnace encounter.
+- Greyhaven includes Elder Elara, Mara's inn and Tovin's provisions. Dialogue and a journal track the chapter through its final report.
+- A regional map links the village, Old Pine Road, the glassworks and the crypts. Village and glassworks use original illustrated scenes; the road and crypts use first-person 3D exploration.
+- Shared party XP and levels up to 20. Stats and skill power increase with level; Lys joins at the party's current level. Level-ups fully restore the active party.
+- Buy a tempered weapon, protective leather or a frostglass charm. Their attack, HP, defence and spell bonuses are applied in combat. Healing tonics restore 80 HP; the inn restores the party for 5 shards.
+- Automatic attacks, manual Fracture, Frost Shard and Mending Seal; tactical pause queues one order per hero, with ×1 / ×2 speed. Spell costs and current power are visible in their descriptions.
+- Animated blade strokes, impact ripples, a gathering frost sigil with converging shards, and healing rings with rising motes. Effects freeze with tactical pause and respect reduced motion.
+- Six original music loops: title, village, road, crypt exploration, battle and boss. All are rendered with **FluidSynth + MuseScore General HQ**, stereo 48 kHz, in **OGG and AAC**. Eleven sound effects, independent volume levels, global mute and background suspension remain supported.
+- A permanent **Check for updates** menu button. A downloaded version is activated only through **Apply update**.
+
+### Start or resume
+
+Choose **New Game** to begin the new story. **Continue** preserves existing saves, including the earlier crypt-only prototype; starting a new journey asks before replacing progress. Save export/import remains available from Settings. All dialogue, progression, equipment, patrols and location state are saved automatically.
+
+The chapter has a complete quest route: clear the road, report to Elara, investigate the furnace, recruit Lys, recover the copper key, open the crypt gate, defeat the Warden and return the memory prism to Greyhaven. The region remains explorable after the ending.
+
+![Greyhaven](docs/chapter-greyhaven.jpg)
+
+## Returning patrols
+
+Cleared sectors can repopulate after **20 seconds of active play outside the sector and out of sight**. Nearby or visible sites do not spawn a replacement. Each area allows at most one returning patrol, so a distant crypt patrol does not prevent the road from repopulating. The three road sites and three ordinary crypt sites are eligible; the furnace encounter and Warden never return. Returning patrols grant reduced rewards (10 shards, 6 HP and 4 MP each, plus 12 party XP), and never undo quest completion. Pauses, dialogs and backgrounded tabs stop active time.
+
+## Controls
+
+| Action | Keyboard |
+| --- | --- |
+| Forward / backward | W or Z / S, or Up / Down |
+| Turn left / right | Left / Right |
+| Step sideways | A or Q / D |
+| Interact | E |
+| Region map (discovered map in legacy saves) | M |
+| Pause / resume combat | Space |
+| Fracture / Frost Shard / Mending Seal | 1 / 2 / 3 |
+
+The outdoor road follows a defined path through the forest. Travel between unlocked places is free outside combat. Retreat preserves HP/MP and resets undefeated opponents. Combat saves resume at the encounter checkpoint rather than mid-animation.
 
 ## Development
 
@@ -40,42 +56,21 @@ pnpm test
 pnpm build
 ```
 
-The production build runs strict TypeScript checks, compiles into `dist/`, creates the offline cache and packages the standalone HTML. Browser code is in `src/`; authoring scripts are in `scripts/`. The Python music-rendering script requires numpy, FluidSynth, ffmpeg and a local General MIDI SoundFont; neither is needed to play or build the game normally. All graphics, sound effects and scores are local files.
+The build checks TypeScript, produces `dist/`, builds the versioned offline cache and packages `release/The-Glass-Below.html`. The standalone HTML embeds the environment illustrations, creatures and both audio codecs. Installation as a PWA requires HTTPS. Browser storage is versioned and existing prototype saves remain compatible.
 
-| Action | Keyboard |
-| --- | --- |
-| Forward / backward | W or Z / S, or Up / Down |
-| Turn left / right | Left / Right |
-| Step sideways | A or Q / D |
-| Interact | E |
-| Map | M |
-| Pause / resume | Space |
-| Fracture / Frost Shard / Mending Seal | 1 / 2 / 3 |
+- `src/campaign.ts`: chapter state, XP, equipment, quests, travel and outdoor patrol rules.
+- `src/chapter-ui.ts` and `src/chapter.css`: dialogue, village, region map, journal and party UI.
+- `src/engine.ts`: deterministic world/combat simulation, legacy crypt mode and patrols.
+- `src/renderer.ts`: 3D stone architecture and forest geometry, animated creature billboards.
+- `src/impact-art.ts` and `src/spell-art.ts`: procedural combat animations.
+- `src/save.ts`, `src/audio.ts` and `src/updates.ts`: persistence, Web Audio and explicit updates.
 
-While paused, selecting a skill queues it; selecting it again cancels it. A new order replaces that hero’s previous order. MP is spent at execution after resuming, with a 0.65-second interval between skills. Combat effects freeze too; the music is ducked. Opening the map or menu pauses combat and does not resume it automatically.
+### Music authoring
 
-Victory restores 18 HP and 10 MP per hero. The spring fully restores the group once. Retreat preserves current HP and MP but resets undefeated enemies. Saves retain the checkpoint at the start of a fight and update after victory. The original save key and version remain compatible with prototype 0.1; the menu can import its exported saves.
+Editable MIDI scores and render reports are in `music/`. Run `python3 scripts/render-soundfont.py` with numpy, FluidSynth, ffmpeg and a local General MIDI bank. Set `GLASS_SOUNDFONT` to choose another bank; the default is the local MuseScore General HQ used in the neighbouring projects. `GLASS_TRACKS=title,village,road` renders only those scores. The SoundFont itself is not part of the repository. The renderer checks for overlapping notes, renders three passes, extracts a settled loop, bridges the seam and checks decoded OGG/AAC peaks. `public/audio/manifest.json` records sample rates, durations and levels. The original sound-effect synthesis remains in `scripts/compose-audio.py`.
 
-## Returning patrols
+## Verification and deployment
 
-The entrance corridor (`first`), central passage (`pair`) and eastern passage (`passage`) can repopulate four minutes after victory, measured in active game time. A site must be at least five tiles away and outside line of sight; only one returning patrol can be present. The boss and the other two encounters never respawn. First-clear progress, the key, the gate and the spring are preserved. A returning patrol grants 10 shards, 6 HP and 4 MP per hero; victory starts a fresh cooldown. Timers and active patrols survive saves and imports. Older saves receive a fresh four-minute grace period.
+Automated tests cover both the legacy expedition and the complete chapter quest chain, solo/recruited combat, XP and equipment effects, save migration, map constraints, patrol timing/visibility, audio codecs/scene transitions, update checks and creature/effect framing. Browser checks cover desktop, tablet and iPhone-sized portrait/landscape layouts. Physical-device Safari audio, battery use and PWA installation still require on-device checks.
 
-## GitHub Pages
-
-`.github/workflows/deploy.yml` runs the tests, builds, and deploys `dist/` on pushes to `main`. Pages must use **GitHub Actions** as its source. Relative paths support deployment beneath `/the-glass-below/`. The service worker scopes its cache by URL path and never resets player progress.
-
-## Verification
-
-The 38 automated tests cover world connectivity and gate requirements, a complete expedition, combat pause, queued actions, cooldowns, interrupts, targeting, save validation, transient captions, impact projection, all fifteen creature-frame bounds, full-size framing across phone and desktop sizes, one opponent per encounter, patrol cooldowns, off-screen spawn rules, reduced repeat rewards, legacy-save migration and update-check states, thin impact strokes, codec fallback, music transitions, duplicate playback prevention, mute and background audio handling. Audio assets are also independently probed for valid codecs and duration.
-
-Browser layout checks cover iPhone-sized portrait/landscape views, a large tablet and desktop. Real-device Safari audio behavior, performance and PWA installation still require physical-device checks.
-
-The updated dungeon and interface:
-
-![Updated crypt architecture and lighting](docs/crypts-upgrade.jpg)
-
-![Permanent update check](docs/update-menu.jpg)
-
-## Original assets
-
-`public/art/bestiary.png` contains five poses for each of three creatures; `src/creature-frames.ts` records their individual crop coordinates. `public/art/impacts.png` provides the ice and healing spell illustrations; physical hits are drawn with Canvas 2D strokes in `src/impact-art.ts`. Original MIDI scores are in `music/`; render them with `python3 scripts/render-soundfont.py` (set `GLASS_SOUNDFONT` if needed). The renderer uses the local MuseScore General HQ bank, preserves settled reverb at the loop boundary, and generates OGG plus AAC. Sound effects retain the synthesis from `scripts/compose-audio.py`; `public/audio/manifest.json` records exact loop durations and audio levels. Architectural textures, lighting, particles and app icons are generated by code.
+`.github/workflows/deploy.yml` tests, builds and deploys `dist/` on pushes to `main`. GitHub Pages uses GitHub Actions and relative asset paths. Environment illustrations are original generated artwork; the existing creature drawings are unchanged. Hollow Oath informed the illustrated combat style and Dinosaur Resurrection only the exploration perspective; no assets from either game are included.

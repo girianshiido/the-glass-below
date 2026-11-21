@@ -1,6 +1,7 @@
+import {ROAD_ENCOUNTERS} from './campaign.ts';
 import {makeStone,makeFlame} from './stone-art.ts';
 import {MAP,WIDTH,HEIGHT,wall,ENCOUNTERS,CHEST,SHRINE,GATE,EXIT,same} from './world.ts';
-import {CREATURES,visibleEnemy,encounterActive} from './engine.ts';
+import {CREATURES,visibleEnemy,encounterActive,encounterDefinition} from './engine.ts';
 import type {Game,Enemy} from './engine.ts';
 import {creatureFrame,creatureLayout,VERTICAL_FOV,CAMERA_HEIGHT,DEFAULT_INSETS} from './combat-view.ts';
 import type {CombatInsets} from './combat-view.ts';
@@ -38,7 +39,7 @@ export class DungeonRenderer {
   private positions:number;private normals:number;private uvs:number;
   private uniforms:Record<string,WebGLUniformLocation|null>={};
   private walls:Mesh;private floor:Mesh;private ceiling:Mesh;
-  private dynamic:Mesh;private ornament:Mesh;
+  private dynamic:Mesh;private ornament:Mesh;private forestGround:Mesh;private forestPath:Mesh;private forestTrunks:Mesh;private forestLeaves:Mesh;private grass:WebGLTexture;private gravel:WebGLTexture;
   private wallTexture:WebGLTexture;private floorTexture:WebGLTexture;private white:WebGLTexture;private glow:WebGLTexture;private flame:WebGLTexture;
   private atlas:WebGLTexture|null=null;
   private torches:Vec[]=[[2,1.72,.76],[.76,1.72,5],[8,1.72,4.76],[10,1.72,.76],[16,1.72,4.76],[17.24,1.72,11]].map(([x,y,z])=>[x*CELL,y,z*CELL]);
@@ -93,6 +94,15 @@ export class DungeonRenderer {
       }
     }
     this.ornament=this.mesh(ornament);this.walls=this.mesh(walls);this.floor=this.mesh(floor);this.ceiling=this.mesh(ceiling);this.dynamic=this.mesh([]);
+    const ground:number[]=[],path:number[]=[],trunks:number[]=[],leaves:number[]=[];
+    for(let x=-4;x<16;x++)for(let z=-5;z<8;z++)quad(z===1?path:ground,[x*CELL,0,(z-.5)*CELL],[(x+1)*CELL,0,(z-.5)*CELL],[(x+1)*CELL,0,(z+.5)*CELL],[x*CELL,0,(z+.5)*CELL],[0,1,0]);
+    for(let x=-2;x<15;x++)for(const side of [-1,1])for(let row=0;row<3;row++){
+      const tx=x*CELL+.7*Math.sin(x*13+row),tz=CELL+side*(2.7+row*3.1),height=4.5+Math.sin(x*9+row)*1.3;
+      box(trunks,tx,0,tz,.26,height,.28);
+      for(let layer=0;layer<3;layer++){const base=1.2+layer*.95,radius=1.6-layer*.3;for(let k=0;k<8;k++){const a=k*Math.PI/4,b=(k+1)*Math.PI/4;quad(leaves,[tx+Math.cos(a)*radius,base,tz+Math.sin(a)*radius],[tx+Math.cos(b)*radius,base,tz+Math.sin(b)*radius],[tx,base+height*.65,tz],[tx,base+height*.65,tz],[Math.cos(a),.6,Math.sin(a)]);}}
+    }
+    const terrain=(road:boolean)=>{const c=document.createElement('canvas');c.width=c.height=256;const ctx=c.getContext('2d')!;ctx.fillStyle=road?'#394043':'#203b32';ctx.fillRect(0,0,256,256);let seed=road?123:321;for(let i=0;i<4500;i++){seed=(seed*1664525+1013904223)>>>0;const a=seed%256;seed=(seed*1664525+1013904223)>>>0;const b=seed%256;ctx.fillStyle=i%3===0?'#b7b99525':'#061d212e';ctx.fillRect(a,b,road?3+i%8:1,road?2:5+i%9);}return c;};
+    this.grass=this.texture(terrain(false));this.gravel=this.texture(terrain(true));this.forestGround=this.mesh(ground);this.forestPath=this.mesh(path);this.forestTrunks=this.mesh(trunks);this.forestLeaves=this.mesh(leaves);
     this.ready=this.loadAtlas().catch(error=>{this.error=String(error);throw error;});
     canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();this.error='The graphics context was lost. Reload to resume your saved expedition.';});
   }
@@ -114,11 +124,12 @@ export class DungeonRenderer {
     let recent;for(let i=g.feedback.length-1;i>=0;i--){const f=g.feedback[i];if(f.kind==='hurt'&&battle&&battle.time-f.time<.32){recent=f;break;}}
     const shake=recent&&!battle?.paused?Math.sin((battle!.time-recent.time)*80)*.025:0;
     const eye:Vec=[camera.x*CELL,CAMERA_HEIGHT+shake,camera.y*CELL];
-    const encounter=battle?ENCOUNTERS.find(e=>e.id===battle.encounter):undefined;
+    const battleEncounter=battle?encounterDefinition(battle.encounter):undefined;
     const advance=battle?Math.max(0,...battle.enemies.map(e=>{const age=battle.time-e.strikeAt;return age>=0&&age<.3?Math.sin(age/.3*Math.PI)*.22:0;})):0;
-    const depth=encounter?Math.max(.7,(encounter.x*CELL-eye[0])*Math.cos(camera.yaw)+(encounter.y*CELL-eye[2])*Math.sin(camera.yaw)-advance):0;
-    const framing=encounter&&battle?creatureLayout(encounter.kind,this.canvas.clientWidth,this.canvas.clientHeight,depth,this.combatInsets):undefined;
+    const depth=battleEncounter?Math.max(.7,(battleEncounter.x*CELL-eye[0])*Math.cos(camera.yaw)+(battleEncounter.y*CELL-eye[2])*Math.sin(camera.yaw)-advance):0;
+    const framing=battleEncounter&&battle?creatureLayout(battleEncounter.kind,this.canvas.clientWidth,this.canvas.clientHeight,depth,this.combatInsets):undefined;
     gl.uniformMatrix4fv(this.uniforms.uProjection,false,projection(w/h,framing?.shiftY??0));gl.uniformMatrix4fv(this.uniforms.uView,false,view(eye,camera.yaw+shake*.3));gl.uniform3fv(this.uniforms.uEye,eye);gl.uniform3fv(this.uniforms['uTorches[0]'],this.torches.flat());gl.uniform1f(this.uniforms.uTime,clock);
+    if(g.campaign?.zone==='road'){this.renderRoad(g,camera,clock,framing?.scale??1);return;}
     gl.depthMask(true);this.draw(this.floor,this.floorTexture,[.8,.9,.88]);this.draw(this.ceiling,this.wallTexture,[.52,.62,.67]);this.draw(this.walls,this.wallTexture);this.draw(this.ornament,this.white,[.24,.39,.37]);
     const props:number[]=[];
     // Closed iron gate physically occludes the far corridor and its monsters.
@@ -150,7 +161,7 @@ export class DungeonRenderer {
     }
     if(!g.shrineUsed)this.transient(this.billboard(SHRINE.x*CELL,SHRINE.y*CELL,1.1,1.6,camera.yaw,[0,0,1,1],.08),this.glow,[.3,1,1],2,.7);
     const sprites:{x:number;y:number;kind:keyof typeof CREATURES;enemy?:Enemy;distance:number;scale:number}[]=[];
-    for(const encounter of ENCOUNTERS){
+    for(const encounter of (g.campaign?.zone==='glassworks'&&battleEncounter?[battleEncounter]:ENCOUNTERS)){
       const active=battle?.encounter===encounter.id&&(g.phase==='combat'||g.phase==='victory');if(!encounterActive(g,encounter.id)&&!active)continue;
       const layout=active&&framing?framing:creatureLayout(encounter.kind,this.canvas.clientWidth,this.canvas.clientHeight,Math.hypot(encounter.x-camera.x,encounter.y-camera.y)*CELL,{top:0,bottom:0});
       const enemy=active?visibleEnemy(battle!):undefined;if(enemy&&enemy.hp<=0&&battle!.time-enemy.deathAt>.65&&g.phase!=='victory')continue;
@@ -165,11 +176,22 @@ export class DungeonRenderer {
       const attack=e&&battle!.time-e.strikeAt<.3?Math.sin((battle!.time-e.strikeAt)/.3*Math.PI)*.22:0;
       const x=sprite.x*CELL-Math.cos(camera.yaw)*attack,z=sprite.y*CELL-Math.sin(camera.yaw)*attack;
       const alpha=e&&e.hp<=0?Math.max(0,1-(battle!.time-e.deathAt)/.65):1;
-      const tint:Vec=e&&e.stunned>0?[.56,.94,1]:e&&battle!.time-e.hurtAt<.18?[1.4,.74,.65]:[1,1,1];
+      const tint:Vec=e&&e.stunned>0&&e.frozen?[.56,.94,1]:e&&battle!.time-e.hurtAt<.18?[1.4,.74,.65]:[1,1,1];
       this.transient(this.billboard(x,z,frame.width*sprite.scale,frame.height*sprite.scale,camera.yaw,frame.uv),this.atlas,tint,1,alpha);
     }
     gl.depthMask(true);
   }
+  private renderRoad(g:Game,camera:Camera,clock:number,scale:number){
+    const gl=this.gl;gl.clearColor(.065,.12,.16,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.depthMask(true);
+    this.draw(this.forestGround,this.grass,[.7,.9,.8]);this.draw(this.forestPath,this.gravel,[.85,.83,.73]);this.draw(this.forestTrunks,this.wallTexture,[.6,.5,.4]);this.draw(this.forestLeaves,this.grass,[.55,.85,.7],1);gl.depthMask(false);
+    if(this.atlas)for(const encounter of [...ROAD_ENCOUNTERS].reverse()){
+      const active=g.battle?.encounter===encounter.id;if(!encounterActive(g,encounter.id)||g.phase==='victory'&&active)continue;
+      const e=active?visibleEnemy(g.battle!):undefined;let pose=Math.floor(clock*1.7)%2;if(e){if(e.hp<=0||g.battle!.time-e.hurtAt<.24)pose=4;else if(g.battle!.time-e.strikeAt<.32)pose=3;else if(e.windup>0)pose=2;}
+      const f=creatureFrame(encounter.kind,pose),factor=active?scale:1;
+      this.transient(this.billboard(encounter.x*CELL,encounter.y*CELL,f.width*factor,f.height*factor,camera.yaw,f.uv),this.atlas,e&&e.stunned>0&&e.frozen?[.56,.94,1]:[1,1,1],1);
+    }gl.depthMask(true);gl.clearColor(.025,.065,.075,1);
+  }
+
 }
 export function drawMap(canvas:HTMLCanvasElement,g:Game,full=false){
   const ctx=canvas.getContext('2d')!,dpr=Math.min(devicePixelRatio||1,2),width=canvas.clientWidth,height=canvas.clientHeight;

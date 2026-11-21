@@ -8,8 +8,8 @@ export function drawThinImpact(c:CanvasRenderingContext2D,variant:number,progres
   function line(ax:number,ay:number,bx:number,by:number,bend:number,width:number){
     const sweep=Math.min(1,t*4.5);
     const path=()=>{c.beginPath();c.moveTo(ax,ay);c.quadraticCurveTo((ax+bx)/2,(ay+by)/2+bend,ax+(bx-ax)*sweep,ay+(by-ay)*sweep);};
-    c.strokeStyle=color;c.lineWidth=width;path();c.stroke();
-    c.strokeStyle='#fffbed';c.lineWidth=.85;path();c.stroke();
+    c.shadowColor=color;c.shadowBlur=3;c.strokeStyle=color;c.lineWidth=width;path();c.stroke();
+    c.shadowBlur=0;c.strokeStyle='#fffbed';c.lineWidth=.85;path();c.stroke();
   }
   const rx=size*.36,ry=size*.23;
   if(kind==='hurt'){
@@ -21,6 +21,7 @@ export function drawThinImpact(c:CanvasRenderingContext2D,variant:number,progres
     else{line(x-rx*.9,y+ry,x+rx*.9,y-ry,-size*.05,1.6);line(x-rx*.68,y-ry*.65,x+rx*.68,y+ry*.65,size*.025,1.2);}
     if(kind==='break')line(x-rx*.65,y-ry*.8,x+rx*.65,y+ry*.8,size*.04,1.6);
   }
+  if(motion&&progress>.14&&progress<.75){c.globalAlpha=fade*(1-progress)*.55;c.strokeStyle=color;c.lineWidth=.8;c.beginPath();c.arc(x,y,size*(.025+progress*.12),0,Math.PI*2);c.stroke();c.globalAlpha=fade;}
   if(motion){
     c.strokeStyle=kind==='hurt'?'#e9a68e':'#e9c98c';c.lineWidth=1;
     const count=kind==='break'?8:6;

@@ -1,6 +1,10 @@
+import {setupCampaign,activeHero,roadMove,campaignAction,xpNeeded,FURNACE} from './campaign.ts';
+import {ChapterUI,ZONE_NAMES} from './chapter-ui.ts';
+import type {Zone} from './campaign.ts';
 import {checkForUpdate} from './updates.ts';
 import './style.css';
-import {createGame,tick,move,turn,interact,SKILLS,CREATURES,togglePause,useSkill,selectTarget,continueAfterBattle,retreat,livingTarget,visibleEnemy,canUse} from './engine.ts';
+import './chapter.css';
+import {createGame,beginBattle,tick,move,turn,interact,SKILLS,CREATURES,togglePause,useSkill,selectTarget,continueAfterBattle,retreat,livingTarget,visibleEnemy,canUse,skillPower} from './engine.ts';
 import type {Game,Skill} from './engine.ts';
 import {CARDINALS,ENCOUNTERS,MAP} from './world.ts';
 import {GAME_TITLE,LEVEL_TITLE,caption,captionOpacity,objective} from './hud.ts';
@@ -41,14 +45,14 @@ app.innerHTML=`
   <div class="compass" aria-label="Facing direction"><div id="compass-face">${icon('compass')}</div><b id="heading">E</b></div>
   <button class="minimap" id="mini-button" aria-label="Open map"><canvas id="minimap"></canvas></button>
   <div id="enemy-cards" class="enemy-cards" aria-label="Enemies and targets"></div>
-  <div id="outcome" class="outcome" hidden></div>
+  <section id="chapter-screen" hidden></section><div id="outcome" class="outcome" hidden></div>
   <div id="floaters" aria-hidden="true"></div>
   <div id="loading" class="loading"><span class="loading-symbol">◇</span><p>Opening the crypts…</p></div>
-  <div id="intro" class="intro" hidden><div class="intro-symbol">◇</div><h2>The Glass<br><em>Below</em></h2><p>Light survives beneath the stone.</p><button class="primary" id="enter-button">Enter the crypts</button></div>
+  <div id="intro" class="intro title-screen"><div class="title-copy"><span class="title-eyebrow">A GREYHAVEN CHRONICLE</span><h2>The Glass<br><em>Below</em></h2><p>Some things should never be remembered.</p><div class="title-actions"><button class="primary" id="new-game-button">New Game</button><button class="secondary" id="continue-game-button">Continue</button><button class="text-button" id="title-settings">Settings</button></div><span class="title-edition">CHAPTER I · THE BORROWED LIGHT</span></div></div>
   <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
  </section>
  <section class="control-deck" aria-label="Game controls">
-  <div class="party" id="party"></div>
+  <div class="party" id="party"></div><nav class="chapter-navigation" id="chapter-navigation" aria-label="Adventure"><button data-adventure="region">Region</button><button data-adventure="party">Party</button><button data-adventure="journal">Journal</button><button id="tonic-button">Tonic <span id="tonic-count"></span></button></nav>
   <div class="action-panel">
    <div class="skills" id="skills"></div>
    <div class="combat-tools"><button id="pause-button" class="pause-button">${icon('pause')}<span>Pause</span><kbd>Space</kbd></button><button id="speed-button" class="speed-button" title="Combat speed" aria-label="Combat speed: normal">×1</button><button id="retreat-button" class="text-button">Retreat</button></div>
@@ -63,12 +67,12 @@ app.innerHTML=`
 <dialog id="dialog"><div class="dialog-head"><h2 id="dialog-title"></h2><button class="tool" id="close-dialog" aria-label="Close">${icon('close')}</button></div><div id="dialog-body"></div></dialog><input type="file" id="import-file" accept="application/json,.json" hidden />`;
 
 const $=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id)as T;
-let game:Game=load()??createGame(),started=false,ready=false;
+let game:Game=load()??setupCampaign(createGame()),started=false,ready=false;
 let camera:Camera={x:game.position.x,y:game.position.y,yaw:game.direction*Math.PI/2};
 let lastTime=performance.now(),renderTime=0,lastUi=0,previousPhase=game.phase,lastFeedback=0,dirtyMap=true,lastSeen=game.seen.size,transition=0;
 let renderer:DungeonRenderer;
 const dialog=$<HTMLDialogElement>('dialog');
-const newPlayer=game.playTime===0;
+const hasCheckpoint=!!load();$('continue-game-button').toggleAttribute('disabled',!hasCheckpoint);
 const audio=new GameAudio();
 const effects=new CombatEffects($('floaters'),document.querySelector<HTMLElement>('.viewport')!);
 const motionPreference=matchMedia('(prefers-reduced-motion: reduce)');
@@ -76,32 +80,38 @@ let reducedMotion=motionPreference.matches,outcomeReadyAt=0;
 motionPreference.addEventListener('change',event=>{reducedMotion=event.matches;});
 document.addEventListener('pointerdown',()=>{void audio.unlock();},{capture:true,passive:true});
 const party=$('party'),skillPanel=$('skills');
-party.innerHTML=game.heroes.map((h,i)=>`<div class="hero hero-${i}" id="hero-${i}"><div class="portrait" aria-hidden="true"><span>${i===0?'K':'L'}</span><i>${icon(i===0?'sword':'snow')}</i></div><div class="hero-info"><div class="hero-name"><strong>${h.name}</strong><span>${i===0?'VANGUARD':'FROSTWEAVER'}</span></div><div class="hero-meter hp"><i></i></div><div class="hero-values"><span class="hp-value"></span><span class="mp-value"></span></div><div class="hero-meter mp"><i></i></div></div></div>`).join('');
+party.innerHTML=game.heroes.map((h,i)=>`<div class="hero hero-${i}" id="hero-${i}"><div class="portrait" aria-hidden="true"><span>${i===0?'K':'L'}</span><i>${icon(i===0?'sword':'snow')}</i></div><div class="hero-info"><div class="hero-name"><strong>${h.name}</strong><b class="hero-level"></b><span class="xp-readout"></span><span>${i===0?'VANGUARD':'FROSTWEAVER'}</span></div><div class="hero-meter hp"><i></i></div><div class="hero-values"><span class="hp-value"></span><span class="mp-value"></span></div><div class="hero-meter mp"><i></i></div></div></div>`).join('');
 skillPanel.innerHTML=(Object.keys(SKILLS)as Skill[]).map((id,i)=>{const s=SKILLS[id];return `<button class="skill skill-${id}" data-skill="${id}" title="${s.description}" aria-label="${s.name} : ${s.description}"><div class="skill-top">${icon(['sword','snow','heal'][i])}<kbd>${i+1}</kbd></div><strong>${s.name}</strong><span>${s.cost} MP · ${game.heroes[s.hero].name}</span><div class="skill-cooldown"></div><b class="cooldown-label"></b><i class="queued">${icon('check')}</i></button>`;}).join('');
+const chapter=new ChapterUI($('chapter-screen'),()=>game,()=>{persist();ui();},showDialog,enterZone,()=>{if(game.campaign?.stage===3){beginBattle(game,FURNACE);enemyMarkup='';ui();}});
+function enterZone(zone:Zone){effects.clear();camera={x:game.position.x,y:game.position.y,yaw:game.direction*Math.PI/2};dirtyMap=true;enemyMarkup='';$('enemy-cards').innerHTML='';announceLevel();void zone;}
+function beginPlaying(){started=true;$('intro').hidden=true;lastTime=performance.now();ui();if(game.campaign&&!game.campaign.introRead){game.campaign.introRead=true;persist();showDialog('A letter without a name',`<p class="chapter-kicker">CHAPTER I · THE BORROWED LIGHT</p><p class="dialog-intro">Kael reaches Greyhaven with a letter in his coat and no memory of who gave it to him. Inside is a single shard of blue glass and seven words:</p><blockquote class="story-quote">When the bell forgets, follow the light.</blockquote><p class="dialog-intro">At the village fountain, an old woman searches the faces of strangers. She seems to be looking for yours.</p><button class="primary" data-chapter="elara">Approach Elder Elara</button>`);}else announceLevel();}
 let noticeCaption:TimedCaption|null=null,levelCaption:TimedCaption|null=null,lastMessage=game.message;
-function announceLevel(){levelCaption=caption(LEVEL_TITLE,performance.now()/1000,3,2);}
+function announceLevel(){const title=game.campaign?ZONE_NAMES[game.campaign.zone]:LEVEL_TITLE;$('level-caption').querySelector('h1')!.textContent=title;$('level-caption').querySelector('span')!.textContent=game.campaign?.zone==='road'?'GREYHAVEN COAST':'DEPTH I';levelCaption=caption(title,performance.now()/1000,3,2);}
 function notify(text:string){noticeCaption=text?caption(text,performance.now()/1000):null;}
 function updateCaptions(now:number){
   const notice=$('notice'),level=$('level-caption'),n=captionOpacity(noticeCaption,now),l=captionOpacity(levelCaption,now);
   notice.hidden=n<=0||!started||!!game.battle?.paused;notice.style.opacity=String(n);
   notice.textContent=noticeCaption?.text??'';
-  level.hidden=l<=0||!started||game.phase!=='explore';level.style.opacity=String(l);
+  level.hidden=l<=0||!started||game.phase!=='explore';level.style.opacity=String(l);const mini=$('mini-button'),hideMini=!level.hidden;if(mini.hidden!==hideMini){mini.hidden=hideMini;dirtyMap=true;}
 }
 function persist(){if(!save(game))notify('Saving is unavailable. Export your expedition from the menu.');}
 function ui(){
   const fighting=game.phase==='combat',b=game.battle;
+  const c=game.campaign,hub=!!c&&['village','glassworks'].includes(c.zone)&&game.phase==='explore';app.dataset.campaign=String(!!c);app.dataset.hub=String(hub);app.dataset.zone=c?.zone??'crypts';chapter.render(started);$('chapter-navigation').hidden=!started||!c;$('tonic-count').textContent=String(c?.potions??0);$<HTMLButtonElement>('tonic-button').disabled=!c||c.potions===0||!['explore','combat'].includes(game.phase);
   app.dataset.phase=game.phase;app.dataset.paused=String(!!b?.paused);app.dataset.started=String(started);
   audio.setScene(musicScene(game,started));audio.setPaused(!!b?.paused);
   $('sound-button').innerHTML=icon(audio.settings.muted?'silent':'sound');$('sound-button').setAttribute('aria-label',audio.settings.muted?'Enable sound':'Mute all sound');$('sound-button').title=audio.settings.muted?'Enable sound':'Mute all sound';
+  $('interact-button').querySelector('span')!.textContent=c?.zone==='road'?'Region map':'Interact';
   $('heading').textContent=CARDINALS[game.direction];$('compass-face').style.transform=`rotate(${game.direction*90+45}deg)`;
   if(game.message!==lastMessage){lastMessage=game.message;notify(game.message);}
   for(let i=0;i<2;i++){
-    const h=game.heroes[i],card=$(`hero-${i}`);card.querySelector<HTMLElement>('.hp i')!.style.width=`${h.hp/h.maxHp*100}%`;card.querySelector<HTMLElement>('.mp i')!.style.width=`${h.mp/h.maxMp*100}%`;
+    const h=game.heroes[i],card=$(`hero-${i}`);card.hidden=!activeHero(game,i);card.querySelector('.hero-level')!.textContent=c?'Lv '+c.level:'';card.querySelector('.xp-readout')!.textContent=c?c.xp+' / '+xpNeeded(c.level)+' XP':'';card.querySelector<HTMLElement>('.hp i')!.style.width=`${h.hp/h.maxHp*100}%`;card.querySelector<HTMLElement>('.mp i')!.style.width=`${h.mp/h.maxMp*100}%`;
     card.querySelector('.hp-value')!.textContent=`${Math.ceil(h.hp)} / ${h.maxHp} HP`;card.querySelector('.mp-value')!.textContent=`${Math.floor(h.mp)} / ${h.maxMp} MP`;card.classList.toggle('fallen',h.hp<=0);
   }
   for(const id of Object.keys(SKILLS)as Skill[]){
     const button=document.querySelector<HTMLButtonElement>(`[data-skill="${id}"]`)!,s=SKILLS[id],cd=b?.cooldowns[id]??0;
-    button.disabled=!canUse(game,id,!b?.paused);
+    const description=id==='heal'?`Restores ${skillPower(game,id)} HP to the most wounded ally.`:`Deals ${skillPower(game,id)} damage. ${id==='frost'?'Interrupts and freezes for 2 seconds.':'Interrupts the target.'}`;button.title=description;button.setAttribute('aria-label',`${s.name} : ${description}`);
+    button.hidden=!activeHero(game,s.hero);button.disabled=!canUse(game,id,!b?.paused);
     button.classList.toggle('is-queued',!!b?.queue.includes(id));button.style.setProperty('--cooldown',`${cd/s.cooldown*100}%`);button.querySelector('.cooldown-label')!.textContent=cd>0?`${cd.toFixed(1)} s`:'';
   }
   $('pause-button').innerHTML=`${icon(b?.paused?'play':'pause')}<span>${b?.paused?'Resume':'Pause'}</span><kbd>Space</kbd>`;
@@ -136,7 +146,7 @@ function updateEnemies(){
   card.querySelector('.enemy-name')!.textContent=e.name;
   card.querySelector('.target-label')!.textContent=`${Math.ceil(e.hp)} / ${e.maxHp}`;
   card.querySelector<HTMLElement>('.enemy-hp i')!.style.width=`${e.hp/e.maxHp*100}%`;
-  card.querySelector('p')!.textContent=e.hp<=0?'Defeated':e.stunned>0?'Frozen':e.windup>0?`${d.skill} · ${e.kind==='sentinel'?'Party':game.heroes[e.target].name}`:'';
+  card.querySelector('p')!.textContent=e.hp<=0?'Defeated':e.stunned>0?(e.frozen?'Frozen':'Staggered'):e.windup>0?`${d.skill} · ${e.kind==='sentinel'?'Party':game.heroes[e.target].name}`:'';
   card.querySelector<HTMLElement>('.intent-meter i')!.style.width=`${e.windup>0?(1-e.windup/d.windup)*100:e.clock/d.period*100}%`;
 
 }
@@ -149,25 +159,32 @@ function updateOutcome(){
 function act(action:string){
   if(!ready||!started||dialog.open||transition>.03||game.phase!=='explore')return;
   const before=game.phase,position={...game.position},hadKey=game.key,gateWasOpen=game.gateOpen,shrineWasUsed=game.shrineUsed;
-  if(action==='turnLeft')turn(game,-1);else if(action==='turnRight')turn(game,1);else if(action==='interact')interact(game);else move(game,action==='forward'?0:action==='back'?2:action==='left'?-1:1);
+  if(game.campaign?.zone==='road'){if(action==='turnLeft'||action==='turnRight')game.direction=(game.direction+(action==='turnLeft'?3:1))%4;else if(action==='interact'){chapter.region();return;}else{const next=roadMove(game,action==='forward'?0:action==='back'?2:action==='left'?-1:1);if(next&&typeof next==='object'){if('id'in next){game.direction=next.x>game.position.x?0:2;beginBattle(game,next);}else game.position=next;}else game.message='The pine forest closes around the path.';}}
+  else if(action==='turnLeft')turn(game,-1);else if(action==='turnRight')turn(game,1);else if(action==='interact')interact(game);else move(game,action==='forward'?0:action==='back'?2:action==='left'?-1:1);
   if(game.key&&!hadKey)audio.play('reward');else if(game.gateOpen&&!gateWasOpen)audio.play('gate');else if(game.shrineUsed&&!shrineWasUsed)audio.play('heal');else if(position.x!==game.position.x||position.y!==game.position.y)audio.play('step');
   const angle=game.direction*Math.PI/2;let delta=angle-camera.yaw;while(delta>Math.PI)delta-=Math.PI*2;while(delta<-Math.PI)delta+=Math.PI*2;camera.yaw=angle-delta;
   transition=.2;dirtyMap=true;if(game.phase==='explore'||before!==game.phase)persist();ui();
 }
-function restart(){effects.clear();outcomeReadyAt=0;game=createGame();camera={x:game.position.x,y:game.position.y,yaw:0};previousPhase='explore';lastFeedback=0;enemyMarkup='';$('enemy-cards').innerHTML='';dirtyMap=true;persist();announceLevel();updateOutcome();ui();}
+function restart(){effects.clear();outcomeReadyAt=0;game=setupCampaign(createGame());camera={x:game.position.x,y:game.position.y,yaw:0};previousPhase='explore';lastFeedback=0;enemyMarkup='';$('enemy-cards').innerHTML='';dirtyMap=true;persist();announceLevel();updateOutcome();ui();}
 function showDialog(title:string,body:string){
   if(game.phase==='combat'&&game.battle&&!game.battle.paused)togglePause(game);
   $('dialog-title').textContent=title;$('dialog-body').innerHTML=body;dialog.showModal();ui();
 }
 function openMap(){
-  showDialog('The Glass Crypts',`<p class="dialog-intro">${objective(game)}</p><canvas id="full-map" aria-label="Map of discovered areas"></canvas><div class="map-legend"><span><i class="legend-player"></i>Party</span><span><i class="legend-enemy"></i>Enemy</span><span><i class="legend-key"></i>Chest</span><span><i class="legend-source"></i>Spring</span></div><p class="fine">${game.gold} shards · ${game.cleared.size} / ${ENCOUNTERS.length} encounters cleared${game.key?' · Copper key':''}</p>`);
+  if(game.campaign){chapter.region();return;}
+  showDialog('The Glass Crypts',`<p class="dialog-intro">${objective(game)}</p><canvas id="full-map" aria-label="Map of discovered areas"></canvas><div class="map-legend"><span><i class="legend-player"></i>Party</span><span><i class="legend-enemy"></i>Enemy</span><span><i class="legend-key"></i>Chest</span><span><i class="legend-source"></i>Spring</span></div><p class="fine">${game.gold} shards · ${game.cleared.size} encounters cleared${game.key?' · Copper key':''}</p>`);
   requestAnimationFrame(()=>drawMap($<HTMLCanvasElement>('full-map'),game,true));
 }
-function openHelp(){showDialog('Field guide',`<div class="guide"><h3>Explore</h3><p>Move one tile at a time and turn through 90°. Creatures are visible in the corridors. Combat begins when one is directly in front of you.</p><p><b>Keyboard:</b> W / Z or ↑ to move forward, S or ↓ to move backward, ← / → to turn, A / Q and D to step sideways. E to interact, M for the map. All actions also have touch controls.</p><h3>Fight</h3><p>Kael and Lys attack automatically. Use the three skills with their buttons or keys <b>1, 2 and 3</b>. Each encounter has one opponent at full size. Defeat it to clear the passage.</p><p><b>Space pauses combat.</b> Queue one skill per hero while paused. A new order replaces that hero’s previous order. MP is spent only when the action executes after resuming. Skills are separated by 0.65 seconds. Selecting a queued skill again cancels it.</p><h3>Read enemy intentions</h3><p>An amber enemy card signals an incoming attack. Fracture and Frost Shard interrupt it. The Warden can strike the entire party.</p><h3>Patrols</h3><p>Three cleared corridors can receive a new patrol after four minutes of active play, only when you are far away and cannot see the site. At most one returning patrol is present. The Warden never returns. Returning patrols grant 10 shards, 6 HP and 4 MP per hero.</p><h3>Survive</h3><p>Each victory restores 18 HP and 10 MP. The spring fully restores the party once. Retreat returns you to the entrance with your current health. After defeat, you can resume the last saved checkpoint.</p><p class="fine">Music and sound effects can be adjusted in the menu.</p></div>`);}
-function openMenu(){showDialog('Expedition',`<div class="menu-stack"><p class="dialog-intro">${objective(game)}</p><p class="expedition-stats">${game.gold} shards · ${game.cleared.size} / ${ENCOUNTERS.length} encounters cleared</p><div class="sound-settings"><label class="sound-toggle">Mute all sound<input id="mute-setting" type="checkbox" ${audio.settings.muted?'checked':''}></label><label class="sound-slider">Music<input id="music-setting" type="range" min="0" max="100" value="${Math.round(audio.settings.music*100)}"></label><label class="sound-slider">Sound effects<input id="effects-setting" type="range" min="0" max="100" value="${Math.round(audio.settings.effects*100)}"></label></div><button class="secondary" data-menu="help">Field guide</button>${game.phase==='combat'?'<button class="secondary" data-menu="ask-retreat">Retreat to the entrance</button>':''}<button class="secondary" data-menu="export">Export save</button><button class="secondary" data-menu="import">Import save</button><button class="secondary" data-menu="install" id="install-button" hidden>Install game</button><button class="secondary" data-menu="check-update" id="check-update-button">Check for updates</button><p id="update-status" class="update-status" role="status" aria-live="polite"></p><button class="secondary" data-menu="update" id="update-button" hidden>Apply update</button><button class="danger-button" data-menu="new">New expedition</button><span class="fine">${GAME_TITLE} · Prototype 0.8</span></div>`);if(installPrompt)$('install-button').hidden=false;if(waitingWorker)$('update-button').hidden=false;}
+function openHelp(){showDialog('Field guide',`<div class="guide"><h3>Explore</h3><p>Move one tile at a time and turn through 90°. Creatures are visible in the corridors. Combat begins when one is directly in front of you.</p><p><b>Keyboard:</b> W / Z or ↑ to move forward, S or ↓ to move backward, ← / → to turn, A / Q and D to step sideways. E to interact, M for the map. All actions also have touch controls.</p><h3>Fight</h3><p>Kael and Lys attack automatically. Use the three skills with their buttons or keys <b>1, 2 and 3</b>. Each encounter has one opponent at full size. Defeat it to clear the passage.</p><p><b>Space pauses combat.</b> Queue one skill per hero while paused. A new order replaces that hero’s previous order. MP is spent only when the action executes after resuming. Skills are separated by 0.65 seconds. Selecting a queued skill again cancels it.</p><h3>Read enemy intentions</h3><p>An amber enemy card signals an incoming attack. Fracture and Frost Shard interrupt it. The Warden can strike the entire party.</p><h3>Patrols</h3><p>Three cleared corridors can receive a new patrol after 20 seconds away, only when you are outside the sector and cannot see the site. At most one returning patrol per area is present. The Warden never returns. Returning patrols grant 10 shards, 6 HP and 4 MP per hero.</p><h3>Survive</h3><p>Each victory restores 18 HP and 10 MP. The spring fully restores the party once. Retreat returns you to the entrance with your current health. After defeat, you can resume the last saved checkpoint.</p><p class="fine">Music and sound effects can be adjusted in the menu.</p></div>`);}
+function openMenu(){showDialog('Expedition',`<div class="menu-stack"><p class="dialog-intro">${objective(game)}</p><p class="expedition-stats">${game.gold} shards · ${game.cleared.size} / ${game.campaign?10:ENCOUNTERS.length} encounters cleared</p><div class="sound-settings"><label class="sound-toggle">Mute all sound<input id="mute-setting" type="checkbox" ${audio.settings.muted?'checked':''}></label><label class="sound-slider">Music<input id="music-setting" type="range" min="0" max="100" value="${Math.round(audio.settings.music*100)}"></label><label class="sound-slider">Sound effects<input id="effects-setting" type="range" min="0" max="100" value="${Math.round(audio.settings.effects*100)}"></label></div><button class="secondary" data-menu="help">Field guide</button><button class="secondary" data-menu="title">Return to title</button>${game.phase==='combat'?'<button class="secondary" data-menu="ask-retreat">Retreat to the entrance</button>':''}<button class="secondary" data-menu="export">Export save</button><button class="secondary" data-menu="import">Import save</button><button class="secondary" data-menu="install" id="install-button" hidden>Install game</button><button class="secondary" data-menu="check-update" id="check-update-button">Check for updates</button><p id="update-status" class="update-status" role="status" aria-live="polite"></p><button class="secondary" data-menu="update" id="update-button" hidden>Apply update</button><button class="danger-button" data-menu="new">New expedition</button><span class="fine">${GAME_TITLE} · Chapter I · 1.0</span></div>`);if(installPrompt)$('install-button').hidden=false;if(waitingWorker)$('update-button').hidden=false;}
 
 app.addEventListener('click',event=>{
   const button=(event.target as Element).closest<HTMLButtonElement>('button');if(!button||button.disabled)return;
+  if(button.dataset.adventure){chapter.action(button.dataset.adventure);return;}
+  if(button.id==='tonic-button'){if(campaignAction(game,'potion')){audio.play('heal');persist();ui();}return;}
+  if(button.id==='title-settings'){openMenu();return;}
+  if(button.id==='continue-game-button'){beginPlaying();return;}
+  if(button.id==='new-game-button'){if(game.playTime>0){showDialog('New Game','<p class="dialog-intro">Replace your saved journey? You can export it from Settings first.</p><button class="primary" data-menu="confirm-new">Begin a new journey</button>');}else{restart();beginPlaying();}return;}
   if(button.dataset.move){act(button.dataset.move);return;}
   if(button.dataset.skill){useSkill(game,button.dataset.skill as Skill);ui();return;}
   if(button.dataset.target){selectTarget(game,Number(button.dataset.target));ui();return;}
@@ -187,12 +204,13 @@ $('close-dialog').addEventListener('click',()=>dialog.close());
 $('dialog-body').addEventListener('input',event=>{const input=event.target as HTMLInputElement;if(input.id==='mute-setting')audio.setSettings({muted:input.checked});if(input.id==='music-setting')audio.setSettings({music:Number(input.value)/100});if(input.id==='effects-setting')audio.setSettings({effects:Number(input.value)/100});ui();});
 $('dialog-body').addEventListener('click',async event=>{
   const action=(event.target as Element).closest<HTMLElement>('[data-menu]')?.dataset.menu;if(!action)return;
+  if(action==='title'){persist();started=false;effects.clear();dialog.close();$('intro').hidden=false;$<HTMLButtonElement>('continue-game-button').disabled=false;ui();return;}
   if(action==='export'){const a=document.createElement('a');const url=URL.createObjectURL(new Blob([serialize(game)],{type:'application/json'}));a.href=url;a.download='the-glass-below-save.json';a.click();URL.revokeObjectURL(url);}
   if(action==='ask-retreat')showDialog('Retreat',`<p class="dialog-intro">Return to the entrance with your current HP and MP? Undefeated enemies will recover.</p><button class="primary" data-menu="retreat">Return to the entrance</button>`);
   if(action==='help')openHelp();
   if(action==='import')$<HTMLInputElement>('import-file').click();
   if(action==='new')showDialog('New expedition',`<p class="dialog-intro">This will replace your current progress. You can export a save from the menu first.</p><button class="primary" data-menu="confirm-new">Start new expedition</button>`);
-  if(action==='confirm-new'){restart();dialog.close();}
+  if(action==='confirm-new'){restart();dialog.close();beginPlaying();}
   if(action==='retreat'){retreat(game);camera={x:game.position.x,y:game.position.y,yaw:0};dirtyMap=true;persist();dialog.close();ui();}
   if(action==='check-update'){
     const button=$<HTMLButtonElement>('check-update-button'),status=$('update-status');button.disabled=true;button.textContent='Checking…';status.textContent='Checking for updates…';
@@ -221,6 +239,7 @@ document.addEventListener('keydown',event=>{
   if(event.repeat&&[' ','1','2','3','m'].includes(key))return;
   if(key===' '){togglePause(game);ui();return;}
   if(key==='m'){openMap();return;}
+  if(game.campaign&&['village','glassworks'].includes(game.campaign.zone)&&game.phase==='explore')return;
   if(['1','2','3'].includes(key)){useSkill(game,(['fracture','frost','heal']as Skill[])[Number(key)-1]);ui();return;}
   if(key==='tab'&&game.phase==='combat'){const target=livingTarget(game);if(target)selectTarget(game,target.id);ui();return;}
   const actions:Record<string,string>={arrowup:'forward',z:'forward',w:'forward',arrowdown:'back',s:'back',arrowleft:'turnLeft',arrowright:'turnRight',q:'left',a:'left',d:'right',e:'interact'};
@@ -246,13 +265,13 @@ function frame(now:number){
   if(started&&!dialog.open&&!document.hidden){tick(game,dt);if(!game.battle?.paused)renderTime+=dt;transition=Math.max(0,transition-dt);}
   const blend=1-Math.exp(-dt*17);camera.x+=(game.position.x-camera.x)*blend;camera.y+=(game.position.y-camera.y)*blend;
   const targetYaw=game.direction*Math.PI/2;let delta=targetYaw-camera.yaw;while(delta>Math.PI)delta-=Math.PI*2;while(delta<-Math.PI)delta+=Math.PI*2;camera.yaw+=delta*blend;
-  renderer.render(game,camera,renderTime);feedback();effects.tick(started&&!document.hidden&&!dialog.open&&!game.battle?.paused?dt*(game.phase==='combat'?(game.battle?.speed??1):1):0,reducedMotion);updateCaptions(now/1000);
+  if(!game.campaign||!started||!['village','glassworks'].includes(game.campaign.zone)||game.phase!=='explore')renderer.render(game,camera,renderTime);feedback();effects.tick(started&&!document.hidden&&!dialog.open&&!game.battle?.paused?dt*(game.phase==='combat'?(game.battle?.speed??1):1):0,reducedMotion);updateCaptions(now/1000);
   if(now-lastUi>80){ui();lastUi=now;}
   if(renderer.error){showDialog('Graphics interrupted',`<p class="dialog-intro">${renderer.error}</p>`);return;}
   requestAnimationFrame(frame);
 }
 try{
   renderer=new DungeonRenderer($<HTMLCanvasElement>('dungeon'));
-  renderer.ready.then(()=>{ready=true;$('loading').hidden=true;started=!newPlayer;$('intro').hidden=!newPlayer;if(started)announceLevel();updateOutcome();ui();requestAnimationFrame(frame);}).catch(()=>{$('loading').innerHTML='<p>The creature artwork could not be loaded. Check your connection and reload.</p>';});
+  renderer.ready.then(()=>{ready=true;$('loading').hidden=true;started=false;$('intro').hidden=false;updateOutcome();ui();requestAnimationFrame(frame);}).catch(()=>{$('loading').innerHTML='<p>The creature artwork could not be loaded. Check your connection and reload.</p>';});
 }catch(error){$('loading').innerHTML=`<p>${String(error)}</p>`;}
 ui();

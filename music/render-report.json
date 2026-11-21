@@ -49,5 +49,56 @@
       "ogg": 0.6800869107246399,
       "m4a": 0.818836510181427
     }
+  },
+  "title": {
+    "seconds": 42.3529375,
+    "loop_seconds": 42.3529375,
+    "bpm": 68,
+    "sample_rate": 48000,
+    "channels": 2,
+    "notes": 75,
+    "peak": 0.6423136014839137,
+    "rms": 0.14,
+    "seam_jump": 0.004219578403908922,
+    "decoded_peaks": {
+      "ogg": 0.6421170830726624,
+      "m4a": 0.6393178701400757
+    },
+    "renderer": "FluidSynth",
+    "soundfont": "MuseScore_General_HQ.sf2"
+  },
+  "village": {
+    "seconds": 44.65114583333333,
+    "loop_seconds": 44.65114583333333,
+    "bpm": 86,
+    "sample_rate": 48000,
+    "channels": 2,
+    "notes": 144,
+    "peak": 0.76,
+    "rms": 0.12750363185364835,
+    "seam_jump": 0.004908984145625368,
+    "decoded_peaks": {
+      "ogg": 0.7593538761138916,
+      "m4a": 0.768410325050354
+    },
+    "renderer": "FluidSynth",
+    "soundfont": "MuseScore_General_HQ.sf2"
+  },
+  "road": {
+    "seconds": 38.4,
+    "loop_seconds": 38.4,
+    "bpm": 100,
+    "sample_rate": 48000,
+    "channels": 2,
+    "notes": 172,
+    "peak": 0.76,
+    "rms": 0.13008503289208687,
+    "seam_jump": 0.0020554428668018918,
+    "decoded_peaks": {
+      "ogg": 0.7520700693130493,
+      "m4a": 0.7579007744789124
+    },
+    "renderer": "FluidSynth",
+    "soundfont": "MuseScore_General_HQ.sf2"
   }
 }

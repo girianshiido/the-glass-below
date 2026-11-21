@@ -1,3 +1,4 @@
+import {campaignObjective} from './campaign.ts';
 import type {Game} from './engine.ts';
 
 export const GAME_TITLE='The Glass Below';
@@ -13,5 +14,6 @@ export function captionOpacity(c:TimedCaption|null,now:number){
   return Math.max(0,1-(age-c.hold)/c.fade);
 }
 export function objective(g:Game){
+  if(g.campaign)return campaignObjective(g);
   return g.cleared.has('guardian')?'Reach the exit':g.gateOpen?'Defeat the Faceless Warden':g.key?'Open the eastern gate':'Find the copper key';
 }

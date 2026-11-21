@@ -35,10 +35,10 @@ test('Physical impacts are short vector strokes, not the thick sprite illustrati
  for(const kind of ['hit','hurt','break'])for(let id=0;id<4;id++){
   const spec=effectFor({kind,id,text:'',time:0});assert.equal(spec.art,'stroke');assert(spec.duration<=.45);
  }
- assert.equal(effectFor({kind:'ice',id:1,text:'',time:0}).art,'atlas');
+ assert.equal(effectFor({kind:'ice',id:1,text:'',time:0}).art,'spell');
 });
 test('Blade art uses thin strokes and small sparks without a filled impact cloud',()=>{
- const widths=[],radii=[],curves=[];const c={lineWidth:1,save(){},restore(){},clearRect(){},beginPath(){},moveTo(){},lineTo(){},quadraticCurveTo(...points){curves.push(points);},stroke(){widths.push(this.lineWidth);},arc(x,y,r){radii.push(r);},fill(){}};
+ const widths=[],radii=[],curves=[];let lastRadius=0;const c={lineWidth:1,save(){},restore(){},clearRect(){},beginPath(){},moveTo(){},lineTo(){},quadraticCurveTo(...points){curves.push(points);},stroke(){widths.push(this.lineWidth);},arc(x,y,r){lastRadius=r;},fill(){radii.push(lastRadius);}};
  for(let variant=0;variant<4;variant++)drawThinImpact(c,variant,.25,160,'hit');
  assert(widths.length>20);assert(Math.max(...widths)<=2.6);assert(Math.max(...radii)<=2);assert(new Set(curves.map(v=>JSON.stringify(v))).size>=4);
 });

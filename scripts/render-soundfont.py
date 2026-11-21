@@ -1,4 +1,4 @@
-"""Arrange the original three scores as MIDI; render with a local GM SoundFont.
+"""Arrange the original chapter scores as MIDI; render with a local GM SoundFont.
 Requires numpy, FluidSynth and ffmpeg. Set GLASS_SOUNDFONT to override the bank.
 The SoundFont is used locally and is never copied into the repository.
 """
@@ -10,20 +10,40 @@ FONT=Path(os.environ.get('GLASS_SOUNDFONT',ROOT.parent/'science-fantasy-jrpg/sou
 if not FONT.is_file():raise SystemExit('Set GLASS_SOUNDFONT to a General MIDI .sf2 file.')
 RATE=48000;PPQ=480
 OUT=ROOT/'public/audio';MIDI=ROOT/'music';MIDI.mkdir(exist_ok=True)
-manifest=json.loads((OUT/'manifest.json').read_text());reports={}
+manifest=json.loads((OUT/'manifest.json').read_text());reports=json.loads((MIDI/'render-report.json').read_text()) if (MIDI/'render-report.json').exists() else {}
 def vlq(n):
  b=[n&127];n>>=7
  while n:b.insert(0,(n&127)|128);n>>=7
  return bytes(b)
 def score(name,bpm,bars,passes):
  length=bars*4;events=[];notes=[]
- patches=[49 if name=='level' else 45 if name=='combat' else 48,43,8 if name!='boss' else 60,52]
+ patches={'title':[49,43,8,52],'village':[46,43,68,48],'road':[45,43,73,48]}.get(name,[49 if name=='level' else 45 if name=='combat' else 48,43,8 if name!='boss' else 60,52])
  for ch,program in enumerate(patches):
   events.extend([(0,-3,bytes([0xc0|ch,program])),(0,-2,bytes([0xb0|ch,7,[72,83,77,55][ch]])),(0,-2,bytes([0xb0|ch,10,[38,64,90,72][ch]])),(0,-2,bytes([0xb0|ch,91,48]))])
  def note(ch,pitch,at,dur,vel):notes.append((ch,pitch,at,dur,vel))
  chords=[(50,57,62,65),(46,53,58,62),(48,55,60,65),(45,52,57,60)];melody=[74,77,81,79,77,74,72,69]
  for bar in range(bars):
   chord=chords[(bar//2)%4];root=chord[0];at=bar*4
+  if name in ('title','village','road'):
+   if name=='title':
+    for pitch in chord:note(0,pitch,at,3.8,43)
+    note(1,root-12,at,3.6,50)
+    if bar%2==0:note(2,melody[bar%8],at+.5,2.8,60)
+    if bar%4==3:
+     for pitch in chord[1:]:note(3,pitch,at,3.8,35)
+   elif name=='village':
+    for i in range(4):note(0,chord[i]+12,at+i*.5,1.4,48+i*3)
+    note(1,root-12,at,2.8,50)
+    phrase=[77,79,81,84,81,79,77,76,74,77,79,81,79,77,74,72]
+    note(2,phrase[bar%16],at+.5,1.25,58);note(2,phrase[(bar+1)%16],at+2.5,1.2,49)
+    if bar%2==0:
+     for pitch in chord:note(3,pitch,at,7.8,30)
+   else:
+    for i in range(8):note(0,chord[i%4]+12,at+i*.5,.3,44+i%3*4)
+    note(1,root-12,at,1.6,60);note(1,root-5,at+2,1.6,54)
+    if bar%2==0:note(2,melody[bar%8],at+.5,2.3,62)
+    if bar%4==3:note(9,47,at+3,.3,42)
+   continue
   if name=='level':
    if bar%2==0:
     for pitch in chord:note(0,pitch,at,7.8,48)
@@ -61,7 +81,8 @@ def score(name,bpm,bars,passes):
  return b'MThd'+struct.pack('>IHHH',6,0,1,PPQ)+b'MTrk'+struct.pack('>I',len(data))+data,len(notes),tempo
 with tempfile.TemporaryDirectory(prefix='glass-fluidsynth-') as folder:
  tmp=Path(folder)
- for name,bpm,bars in [('level',72,16),('combat',116,12),('boss',136,12)]:
+ for name,bpm,bars in [('level',72,16),('combat',116,12),('boss',136,12),('title',68,12),('village',86,16),('road',100,16)]:
+  if os.environ.get('GLASS_TRACKS') and name not in os.environ['GLASS_TRACKS'].split(','):continue
   editable,count,tempo=score(name,bpm,bars,1);(MIDI/(name+'.mid')).write_bytes(editable)
   rendered,_,_=score(name,bpm,bars,3);mid=tmp/(name+'.mid');mid.write_bytes(rendered);wav=tmp/(name+'.wav')
   subprocess.run(['fluidsynth','-ni','-g','0.45','-F',str(wav),'-r',str(RATE),str(FONT),str(mid)],check=True,stdout=subprocess.DEVNULL)
