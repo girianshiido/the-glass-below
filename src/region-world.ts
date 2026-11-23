@@ -1,6 +1,6 @@
 import type {Zone} from './campaign.ts';
 import type {Game} from './engine.ts';
-import {MAP as OLD_MAP,ENCOUNTERS as OLD_ENCOUNTERS} from './world.ts';
+import {MAP as OLD_MAP,ENCOUNTERS as OLD_ENCOUNTERS,DIRECTIONS} from './world.ts';
 import type {Point,EncounterDef} from './world.ts';
 export interface Building{x:number;y:number;w:number;d:number;h:number;roof:number;kind:'inn'|'shop'|'house'|'hall'|'factory'|'tower'}
 export interface Entrance extends Point{id:'inn'|'shop';direction:number}
@@ -37,7 +37,15 @@ export function regionOf(g:Game){return REGION_WORLDS[g.campaign?.zone??'crypts'
 export function regionWall(zone:Zone,x:number,y:number){return REGION_WORLDS[zone].map[y]?.[x]!=='.';}
 export function regionSight(zone:Zone,a:Point,b:Point,gateOpen=true){const n=Math.max(1,Math.ceil(Math.hypot(b.x-a.x,b.y-a.y)*12));for(let i=1;i<=n;i++){const x=Math.round(a.x+(b.x-a.x)*i/n),y=Math.round(a.y+(b.y-a.y)*i/n);if(regionWall(zone,x,y)||zone==='crypts'&&!gateOpen&&x===17&&y===9)return false;}return true;}
 export function regionEncounter(id:string){for(const w of Object.values(REGION_WORLDS)){const e=w.encounters.find(e=>e.id===id);if(e)return e;}return undefined;}
-export function nearbyResident(g:Game){if(!g.campaign||g.phase!=='explore')return undefined;return regionOf(g).residents.find(n=>!(n.id==='lys'&&g.campaign!.recruited)&&Math.abs(n.x-g.position.x)+Math.abs(n.y-g.position.y)<=1);}
+const CELL_METRES=2.6;
+export const INTERACTION_REACH=1.35;
+export const RESIDENT_STOP_DISTANCE=1.15;
+/** Distances use the rendered viewpoint, not the next logical movement cell. */
+function withinReach(g:Game,origin:Point,target:Point){return Math.hypot(target.x-origin.x,target.y-origin.y)*CELL_METRES<=INTERACTION_REACH+1e-8&&regionSight(g.campaign!.zone,origin,target,g.gateOpen);}
+function activeResidents(g:Game){return regionOf(g).residents.filter(n=>!(n.id==='lys'&&g.campaign?.recruited));}
+export function nearbyResident(g:Game,origin:Point=g.position){if(!g.campaign||g.phase!=='explore')return;return activeResidents(g).find(n=>withinReach(g,origin,n));}
+/** One final, short approach lets the player reach a person without occupying their cell. */
+export function residentApproach(g:Game,relative=0):Point|undefined{if(!g.campaign||g.phase!=='explore')return;const[dx,dy]=DIRECTIONS[(g.direction+relative+4)%4],n=activeResidents(g).find(n=>n.x===g.position.x+dx&&n.y===g.position.y+dy);if(!n||!regionSight(g.campaign.zone,g.position,n,g.gateOpen))return;return{x:n.x-dx*RESIDENT_STOP_DISTANCE/CELL_METRES,y:n.y-dy*RESIDENT_STOP_DISTANCE/CELL_METRES};}
 export function nearbyPassage(g:Game){if(!g.campaign||g.phase!=='explore')return undefined;return regionOf(g).passages.find(p=>Math.abs(p.x-g.position.x)+Math.abs(p.y-g.position.y)<=1);}
 export function passageLocked(g:Game,p:Passage){const c=g.campaign;if(!c)return false;if(p.id==='pine-gate')return c.stage<1||!c.villageGateOpen||c.gateOpenedAt!==undefined&&g.playTime-c.gateOpenedAt<.9;if(p.id==='glassworks-door')return c.stage<2;if(p.id==='crypt-stairs')return !c.recruited;return false;}
 export function passageHint(g:Game,p:Passage){if(p.id==='pine-gate'&&g.campaign!.stage<1)return 'Speak to Elder Elara before leaving Greyhaven.';if(p.id==='pine-gate'&&!g.campaign!.villageGateOpen)return 'Open the pine gate';if(p.id==='pine-gate'&&g.campaign!.gateOpenedAt!==undefined&&g.playTime-g.campaign!.gateOpenedAt<.9)return 'The pine gate is opening…';if(p.id==='glassworks-door'&&g.campaign!.stage<2)return 'Clear the three threats on the road first.';if(p.id==='crypt-stairs'&&!g.campaign!.recruited)return 'Find Lys before descending.';return p.label;}
@@ -47,8 +55,10 @@ export function revealRegion(g:Game){const c=g.campaign;if(!c)return;const w=reg
 /** The gate and first trail tile occupy exactly the same point in the outdoor scene. */
 export function regionOffset(zone:Zone):Point{return zone==='road'?{x:20,y:-2}:{x:0,y:0};}
 export function sharedOutdoors(a:Zone,b:Zone){return (a==='village'||a==='road')&&(b==='village'||b==='road');}
-export function entranceAhead(g:Game){if(!g.campaign||g.phase!=='explore')return;const dirs=[[1,0],[0,1],[-1,0],[0,-1]],d=dirs[g.direction];return regionOf(g).entrances.find(p=>p.direction===g.direction&&(p.x===g.position.x+d[0]&&p.y===g.position.y+d[1]||p.x===g.position.x&&p.y===g.position.y));}
-export function nearbyEntrance(g:Game){if(!g.campaign||g.phase!=='explore')return;return regionOf(g).entrances.find(p=>Math.abs(p.x-g.position.x)+Math.abs(p.y-g.position.y)<=1);}
+/** The visible door sits just inside the front edge of its doorstep cell. */
+export function entrancePoint(p:Entrance):Point{const[dx,dy]=DIRECTIONS[p.direction];return{x:p.x+dx*.45,y:p.y+dy*.45};}
+export function entranceAhead(g:Game,origin:Point=g.position){const door=nearbyEntrance(g,origin);return door?.direction===g.direction?door:undefined;}
+export function nearbyEntrance(g:Game,origin:Point=g.position){if(!g.campaign||g.phase!=='explore')return;return regionOf(g).entrances.find(p=>{const target=entrancePoint(p),[dx,dy]=DIRECTIONS[p.direction];return (origin.x-target.x)*dx+(origin.y-target.y)*dy<=0&&withinReach(g,origin,target);});}
 export function roadThreat(g:Game){if(g.campaign?.zone!=='road'||g.phase!=='explore')return;return regionOf(g).encounters.filter(e=>(!g.cleared.has(e.id)||g.roaming.has(e.id))&&Math.hypot(e.x-g.position.x,e.y-g.position.y)<=2.15&&regionSight('road',g.position,e)).sort((a,b)=>Math.hypot(a.x-g.position.x,a.y-g.position.y)-Math.hypot(b.x-g.position.x,b.y-g.position.y))[0];}
 const trailSegments:{ax:number;ay:number;bx:number;by:number}[]=[];
 for(let y=0;y<road.length;y++)for(let x=0;x<road[0].length;x++)if(road[y][x]==='.')for(const[dx,dy]of [[1,0],[0,1]])if(road[y+dy]?.[x+dx]==='.')trailSegments.push({ax:x,ay:y,bx:x+dx,by:y+dy});

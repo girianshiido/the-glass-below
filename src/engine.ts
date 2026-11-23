@@ -57,7 +57,7 @@ export function move(g:Game,relative:number){
   const direction=(g.direction+relative+4)%4,[dx,dy]=DIRECTIONS[direction];
   const next={x:g.position.x+dx,y:g.position.y+dy};
   if(g.campaign?regionWall(g.campaign.zone,next.x,next.y):wall(next.x,next.y)){g.message='The way is blocked.';return false;}
-  if(g.campaign){const p=regionOf(g).passages.find(p=>same(p,next));if(p){if(passageLocked(g,p)){g.message=passageHint(g,p);return false;}if(crossPassage(g))return true;}if(regionOf(g).residents.some(n=>same(n,next)&&!(n.id==='lys'&&g.campaign!.recruited))){g.message='Interact to speak.';return false;}}
+  if(g.campaign){const p=regionOf(g).passages.find(p=>same(p,next));if(p){if(passageLocked(g,p)){g.message=passageHint(g,p);return false;}if(crossPassage(g))return true;}if(regionOf(g).residents.some(n=>same(n,next)&&!(n.id==='lys'&&g.campaign!.recruited))){g.message='Move forward to approach, then interact to speak.';return false;}}
   if((!g.campaign||g.campaign.zone==='crypts')&&same(next,GATE)&&!g.gateOpen){g.message=g.key?'The gate is locked. Interact to use the key.':'A copper key is needed.';return false;}
   const encounter=(g.campaign?regionOf(g).encounters:ENCOUNTERS).find(e=>encounterActive(g,e.id)&&same(e,next));
   if(encounter){g.direction=direction;beginBattle(g,encounter);return false;}
