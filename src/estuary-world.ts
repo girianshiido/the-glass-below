@@ -1,0 +1,63 @@
+import type {Building, RegionWorld} from './region-world.ts';
+
+const estuaryBuildings: Building[] = [
+  {x:10,y:7,w:3,d:2,h:3.65,roof:1.65,kind:'house'},
+  {x:15,y:7,w:3,d:2,h:4.05,roof:1.7,kind:'house'},
+  {x:17,y:12,w:3,d:2,h:3.45,roof:1.45,kind:'house'},
+];
+
+function map(width: number, height: number, spaces: number[][], walls: Building[] = []): string[] {
+  const tiles = Array.from({length: height}, () => Array<string>(width).fill('#'));
+  for (const [x,y,w,d] of spaces) {
+    for (let row=y;row<y+d;row++) tiles[row].fill('.',x,x+w);
+  }
+  for (const {x,y,w,d} of walls) {
+    for (let row=y;row<y+d;row++) tiles[row].fill('#',x,x+w);
+  }
+  return tiles.map(row => row.join(''));
+}
+
+export const ESTUARY_STAGE={
+  rumor:7, trail:8, sluice:9, drained:10, mooring:11, alone:12, ferrymaster:13, joined:14,
+} as const;
+
+export const ROAD_TO_ESTUARY = {x:11,y:7};
+export const SLUICE_WHEEL = {x:19,y:2};
+export const MOORING = {x:21,y:11};
+export const TIDE_GATE = {x:24,y:14};
+export const BELL_STEPS = {x:22,y:3};
+export const LOCK_STAIRS = {x:21,y:5};
+
+export const ESTUARY: RegionWorld = {
+  zone:'estuary',
+  map:map(26,17,[[0,12,9,1],[4,11,2,1],[7,11,4,1],[9,6,13,9],[19,2,1,5],[19,3,4,2],[21,5,1,1],[22,9,2,2],[20,14,5,1]],estuaryBuildings),
+  spawn:{x:1,y:12}, direction:0, outdoor:true, ceiling:0,
+  buildings:estuaryBuildings, residents:[], entrances:[{id:'neris',x:11,y:9,direction:3}],
+  passages:[
+    {id:'estuary-return',x:0,y:12,to:'road',spawn:{x:11,y:8},direction:1,label:'Old Pine Road'},
+    {id:'lock-stairs',...LOCK_STAIRS,to:'lockworks',spawn:{x:2,y:11},direction:3,label:'Descend beneath the quay'},
+    {id:'bell-shortcut',...BELL_STEPS,to:'lockworks',spawn:{x:13,y:1},direction:2,label:'Descend the bell tower stairs'},
+  ],
+  encounters:[
+    {id:'estuary-causeway',x:4,y:12,kind:'scavenger',name:'Saltglass Crawler',strength:1.5},
+    {id:'estuary-weir',x:19,y:5,kind:'wraith',name:'Weir Lantern',strength:1.6},
+    {id:'estuary-quay',x:23,y:9,kind:'scavenger',name:'Quay Skulker',strength:1.45},
+    {id:'tide-stray',x:22,y:14,kind:'scavenger',name:'Tideglass Stalker',strength:1.65},
+  ],
+};
+
+export const LOCKWORKS: RegionWorld = {
+  zone:'lockworks',
+  map:map(17,13,[[2,8,1,5],[2,8,6,1],[5,6,4,4],[8,6,5,1],[12,4,1,3],[10,1,5,4]]),
+  spawn:{x:2,y:11}, direction:3, outdoor:false, ceiling:3.65,
+  buildings:[], residents:[], entrances:[],
+  passages:[
+    {id:'lock-return',x:2,y:12,to:'estuary',spawn:{x:21,y:6},direction:1,label:'Climb to Saltreach'},
+    {id:'bell-stairs',x:14,y:1,to:'estuary',spawn:{x:21,y:3},direction:2,label:'Unbolt the tower door and return outside'},
+  ],
+  encounters:[
+    {id:'lock-trap',x:4,y:8,kind:'scavenger',name:'Sluice Crawler',strength:1.55},
+    {id:'lock-channel',x:10,y:6,kind:'wraith',name:'Drowned Lamplighter',strength:1.7},
+    {id:'bell-keeper',x:12,y:2,kind:'sentinel',name:'The Drowned Keeper',strength:1.48},
+  ],
+};

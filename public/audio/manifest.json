@@ -102,6 +102,23 @@
       },
       "renderer": "FluidSynth",
       "soundfont": "MuseScore_General_HQ.sf2"
+    },
+    "estuary": {
+      "seconds": 42.3529375,
+      "loop_seconds": 42.3529375,
+      "bpm": 68,
+      "sample_rate": 48000,
+      "channels": 2,
+      "notes": 51,
+      "peak": 0.6669782833122906,
+      "rms": 0.14,
+      "seam_jump": 0.0004240167090351493,
+      "decoded_peaks": {
+        "ogg": 0.6576908826828003,
+        "m4a": 0.6665205955505371
+      },
+      "renderer": "FluidSynth",
+      "soundfont": "MuseScore_General_HQ.sf2"
     }
   },
   "effects": {

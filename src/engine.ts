@@ -1,13 +1,13 @@
-import {regionOf,regionWall,regionSight,nearbyPassage,passageLocked,passageHint,regionEncounter,revealRegion,roadThreat} from './region-world.ts';
-import {activeHero,campaignVictory,updateRoadRespawns,CAMPAIGN_ENCOUNTERS,crossPassage} from './campaign.ts';
+import {regionOf,regionWall,regionSight,nearbyPassage,passageLocked,passageHint,regionEncounter,revealRegion,roadThreat,encounterPresent} from './region-world.ts';
+import {activeHero,campaignVictory,updateCampaignPatrols,CAMPAIGN_ENCOUNTERS,crossPassage,companion,PATROL_DELAY} from './campaign.ts';
 import type {Campaign} from './campaign.ts';
 import {ENCOUNTERS,START,CHEST,GATE,SHRINE,EXIT,DIRECTIONS,wall,same,reveal,lineOfSight} from './world.ts';
 import type {Point,CreatureKind,EncounterDef} from './world.ts';
 export type Phase='explore'|'combat'|'victory'|'defeat'|'complete';
-export type Skill='fracture'|'frost'|'heal';
+export type Skill='fracture'|'frost'|'heal'|'breakwater'|'hook';
 export interface Hero {name:string;hp:number;maxHp:number;mp:number;maxMp:number;clock:number;attack:number}
 export interface Enemy {id:number;kind:CreatureKind;name:string;hp:number;maxHp:number;clock:number;windup:number;hurtAt:number;strikeAt:number;deathAt:number;stunned:number;frozen:boolean;target:number}
-export interface Battle {encounter:string;enemies:Enemy[];target:number;time:number;paused:boolean;speed:number;queue:Skill[];cooldowns:Record<Skill,number>;shield:number;globalCooldown:number}
+export interface Battle {encounter:string;enemies:Enemy[];target:number;time:number;paused:boolean;speed:number;queue:Skill[];cooldowns:Record<Skill,number>;shield:number;exposed:boolean;globalCooldown:number}
 export interface Feedback {id:number;kind:'hit'|'hurt'|'heal'|'ice'|'break'|'guard';text:string;enemy?:number;hero?:number;time:number}
 export interface Game {campaign?:Campaign;phase:Phase;position:Point;direction:number;heroes:Hero[];battle:Battle|null;cleared:Set<string>;roaming:Set<string>;respawnAt:Record<string,number>;seen:Set<string>;key:boolean;gateOpen:boolean;chestOpen:boolean;shrineUsed:boolean;gold:number;message:string;feedback:Feedback[];eventId:number;playTime:number}
 export const CREATURES:Record<CreatureKind,{name:string;hp:number;attack:number;period:number;windup:number;skill:string;tip:string;row:number}>={
@@ -18,8 +18,15 @@ export const CREATURES:Record<CreatureKind,{name:string;hp:number;attack:number;
 export const SKILLS:Record<Skill,{name:string;cost:number;cooldown:number;hero:number;description:string}>={
   fracture:{name:'Fracture',cost:5,cooldown:5,hero:0,description:'Deals 38 damage and interrupts the target.'},
   frost:{name:'Frost Shard',cost:7,cooldown:7,hero:1,description:'Deals 30 damage. Interrupts and freezes the target for 2 seconds.'},
+  breakwater:{name:'Breakwater',cost:7,cooldown:8,hero:1,description:'Halves the next enemy strike within 8 seconds.'},
+  hook:{name:'Hook Feint',cost:6,cooldown:7,hero:1,description:'Deals damage and makes the next Fracture hit 50% harder.'},
   heal:{name:'Mending Seal',cost:9,cooldown:10,hero:1,description:'Restores 58 HP to the most wounded ally.'},
 };
+export function partySkills(g:Game):Skill[]{
+  if(companion(g)==='lys')return ['fracture','frost','heal'];
+  if(companion(g)==='neris')return ['fracture','breakwater','hook'];
+  return ['fracture'];
+}
 export function createGame():Game{
   const g:Game={phase:'explore',position:{...START},direction:0,heroes:[
     {name:'Kael',hp:180,maxHp:180,mp:32,maxMp:32,clock:0,attack:12},
@@ -29,23 +36,24 @@ export function createGame():Game{
 }
 function emit(g:Game,kind:Feedback['kind'],text:string,enemy?:number,hero?:number){g.feedback.push({id:++g.eventId,kind,text,enemy,hero,time:g.battle?.time??0});if(g.feedback.length>25)g.feedback.shift();}
 export const PATROL_SITES=['first','pair','passage'] as const;
-export const RESPAWN_DELAY=20;
-export function encounterActive(g:Game,id:string){return !g.cleared.has(id)||g.roaming.has(id);}
+export const RESPAWN_DELAY=PATROL_DELAY;
+export function encounterActive(g:Game,id:string){return encounterPresent(g,id);}
 export function updateRespawns(g:Game){
- if(g.phase!=='explore')return;updateRoadRespawns(g);if(PATROL_SITES.some(id=>g.roaming.has(id)))return;
+ if(g.phase!=='explore')return;
+ if(g.campaign){updateCampaignPatrols(g);return;}
+ if(PATROL_SITES.some(id=>g.roaming.has(id)))return;
  for(const id of PATROL_SITES){
   if(!g.cleared.has(id))continue;
   const e=ENCOUNTERS.find(e=>e.id===id)!;
-  const outside=!!g.campaign&&g.campaign.zone!=='crypts';
-  if(!outside&&(Math.hypot(e.x-g.position.x,e.y-g.position.y)<3||(g.campaign?regionSight('crypts',g.position,e,g.gateOpen):lineOfSight(g.position,e,g.gateOpen)))){g.respawnAt[id]=g.playTime+RESPAWN_DELAY;continue;}
+  if(Math.hypot(e.x-g.position.x,e.y-g.position.y)<3||lineOfSight(g.position,e,g.gateOpen)){g.respawnAt[id]=g.playTime+RESPAWN_DELAY;continue;}
   g.respawnAt[id]??=g.playTime+RESPAWN_DELAY;if(g.playTime<g.respawnAt[id])continue;
   g.roaming.add(id);g.message='Distant footsteps echo through the crypts.';break;
  }
 }
 export function beginBattle(g:Game,encounter:EncounterDef){
   if(g.phase!=='explore'||!encounterActive(g,encounter.id))return false;
-  const d=CREATURES[encounter.kind];
-  g.battle={encounter:encounter.id,enemies:[{id:0,kind:encounter.kind,name:d.name,hp:d.hp,maxHp:d.hp,clock:0,windup:0,hurtAt:-100,strikeAt:-100,deathAt:-100,stunned:0,frozen:false,target:0}],target:0,time:0,paused:false,speed:1,queue:[],cooldowns:{fracture:0,frost:0,heal:0},shield:0,globalCooldown:0};
+  const d=CREATURES[encounter.kind],hp=Math.round(d.hp*(encounter.strength??1));
+  g.battle={encounter:encounter.id,enemies:[{id:0,kind:encounter.kind,name:encounter.name??d.name,hp,maxHp:hp,clock:0,windup:0,hurtAt:-100,strikeAt:-100,deathAt:-100,stunned:0,frozen:false,target:0}],target:0,time:0,paused:false,speed:1,queue:[],cooldowns:{fracture:0,frost:0,heal:0,breakwater:0,hook:0},shield:0,exposed:false,globalCooldown:0};
   g.heroes.forEach(h=>h.clock=0);g.feedback=[];g.phase='combat';g.message=d.tip;return true;
 }
 export function encounterAhead(g:Game){
@@ -57,7 +65,7 @@ export function move(g:Game,relative:number){
   const direction=(g.direction+relative+4)%4,[dx,dy]=DIRECTIONS[direction];
   const next={x:g.position.x+dx,y:g.position.y+dy};
   if(g.campaign?regionWall(g.campaign.zone,next.x,next.y):wall(next.x,next.y)){g.message='The way is blocked.';return false;}
-  if(g.campaign){const p=regionOf(g).passages.find(p=>same(p,next));if(p){if(passageLocked(g,p)){g.message=passageHint(g,p);return false;}if(crossPassage(g))return true;}if(regionOf(g).residents.some(n=>same(n,next)&&!(n.id==='lys'&&g.campaign!.recruited))){g.message='Move forward to approach, then interact to speak.';return false;}}
+  if(g.campaign){const p=regionOf(g).passages.find(p=>same(p,next));if(p){if(passageLocked(g,p)){g.message=passageHint(g,p);return false;}if(crossPassage(g,p))return true;}if(regionOf(g).residents.some(n=>same(n,next)&&!(n.id==='lys'&&g.campaign!.recruited))){g.message='Move forward to approach, then interact to speak.';return false;}}
   if((!g.campaign||g.campaign.zone==='crypts')&&same(next,GATE)&&!g.gateOpen){g.message=g.key?'The gate is locked. Interact to use the key.':'A copper key is needed.';return false;}
   const encounter=(g.campaign?regionOf(g).encounters:ENCOUNTERS).find(e=>encounterActive(g,e.id)&&same(e,next));
   if(encounter){g.direction=direction;beginBattle(g,encounter);return false;}
@@ -89,18 +97,32 @@ export function selectTarget(g:Game,id:number){const e=livingTarget(g);if(g.phas
 function damage(g:Game,e:Enemy,value:number,kind:Feedback['kind']='hit'){
   if(e.hp<=0)return;e.hp=Math.max(0,e.hp-value);e.hurtAt=g.battle!.time;emit(g,kind,`−${value}`,e.id);if(e.hp===0)e.deathAt=g.battle!.time;
 }
-export function skillPower(g:Game,skill:Skill){const level=g.campaign?.level??1;return skill==='fracture'?38+(level-1)*6:skill==='frost'?30+(level-1)*5+(g.campaign?.charm?8:0):58+(level-1)*8;}
-export function canUse(g:Game,skill:Skill,checkGlobal=true){const b=g.battle,d=SKILLS[skill];return g.phase==='combat'&&!!b&&activeHero(g,d.hero)&&g.heroes[d.hero].hp>0&&g.heroes[d.hero].mp>=d.cost&&b.cooldowns[skill]<=0&&(!checkGlobal||b.globalCooldown<=0)&&!!livingTarget(g);}
+export function skillPower(g:Game,skill:Skill){const level=g.campaign?.level??1;switch(skill){
+  case 'fracture':return 38+(level-1)*6;
+  case 'frost':return 30+(level-1)*5+(g.campaign?.charm?8:0);
+  case 'heal':return 58+(level-1)*8;
+  case 'hook':return 22+(level-1)*4;
+  case 'breakwater':return 8;
+}}
+export function canUse(g:Game,skill:Skill,checkGlobal=true){const b=g.battle,d=SKILLS[skill];return g.phase==='combat'&&!!b&&partySkills(g).includes(skill)&&g.heroes[d.hero].hp>0&&g.heroes[d.hero].mp>=d.cost&&b.cooldowns[skill]<=0&&(!checkGlobal||b.globalCooldown<=0)&&!!livingTarget(g);}
 function execute(g:Game,skill:Skill){
   if(!canUse(g,skill))return false;const b=g.battle!,d=SKILLS[skill],hero=g.heroes[d.hero],enemy=livingTarget(g)!;
   hero.mp-=d.cost;b.cooldowns[skill]=d.cooldown;b.globalCooldown=.65;
-  if(skill==='heal'){
+  if(skill==='breakwater'){
+    b.shield=skillPower(g,'breakwater');
+    emit(g,'guard','Guarded');
+    g.message='Neris braces the party for the next strike.';
+  }else if(skill==='hook'){
+    b.exposed=true;
+    damage(g,enemy,skillPower(g,'hook'));
+    g.message='Neris opens the enemy’s guard.';
+  }else if(skill==='heal'){
     const h=g.heroes.filter(h=>h.hp>0).sort((a,b)=>a.hp/a.maxHp-b.hp/b.maxHp)[0];
     const amount=Math.min(skillPower(g,'heal'),h.maxHp-h.hp);h.hp+=amount;emit(g,'heal',`+${amount}`,undefined,g.heroes.indexOf(h));
   }else{
     const interrupted=enemy.windup>0;enemy.windup=0;enemy.clock=0;
     if(skill==='frost'){enemy.frozen=true;enemy.stunned=2;damage(g,enemy,skillPower(g,'frost'),'ice');}
-    else{enemy.frozen=false;enemy.stunned=Math.max(enemy.stunned,.6);damage(g,enemy,skillPower(g,'fracture'),'break');}
+    else{enemy.frozen=false;enemy.stunned=Math.max(enemy.stunned,.6);damage(g,enemy,Math.round(skillPower(g,'fracture')*(b.exposed?1.5:1)),'break');b.exposed=false;}
     g.message=interrupted?'Attack interrupted!':`${d.name} hits its target.`;
   }
   resolve(g);return true;
@@ -122,10 +144,13 @@ function resolve(g:Game){
     const returning=g.roaming.delete(b.encounter);
     if(PATROL_SITES.some(id=>id===b.encounter))g.respawnAt[b.encounter]=g.playTime+RESPAWN_DELAY;
     g.cleared.add(b.encounter);g.phase='victory';b.paused=false;b.queue=[];
-    const boss=b.encounter==='guardian';g.gold+=boss?100:returning?10:20;
-    for(const h of g.heroes){h.hp=Math.min(h.maxHp,Math.max(h.hp,1)+(returning?6:18));h.mp=Math.min(h.maxMp,h.mp+(returning?4:10));}
+    const warden=b.encounter==='guardian',keeper=b.encounter==='bell-keeper';g.gold+=warden||keeper?100:returning?10:20;
+    g.heroes.forEach((h,i)=>{if(activeHero(g,i)){
+      h.hp=Math.min(h.maxHp,Math.max(h.hp,1)+(returning?6:18));
+      h.mp=Math.min(h.maxMp,h.mp+(returning?4:10));
+    }});
     const advancement=campaignVictory(g,b.encounter,returning);
-    g.message=(boss?(g.campaign?'The memory prism is yours. Greyhaven is waiting.':'The Warden has fallen. The exit lies ahead.'):returning?'Patrol defeated · +10 shards, +6 HP and +4 MP each':'Passage cleared · +18 HP and +10 MP each')+(advancement?' · '+advancement:'');
+    g.message=(keeper?'The Drowned Keeper falls. The bell goes still.':warden?(g.campaign?'The memory prism is yours. Greyhaven is waiting.':'The Warden has fallen. The exit lies ahead.'):returning?'Patrol defeated · +10 shards, +6 HP and +4 MP each':'Passage cleared · +18 HP and +10 MP each')+(advancement?' · '+advancement:'');
   }else if(g.heroes.every((h,i)=>!activeHero(g,i)||h.hp<=0)){g.phase='defeat';b.paused=false;b.queue=[];g.message='Your expedition ends here. Return to the last saved checkpoint.';}
   else b.target=visibleEnemy(b).id;
 }
@@ -138,6 +163,7 @@ export function tick(g:Game,dt:number){
   for(let remaining=elapsed;remaining>1e-8&&g.phase==='combat';){
     const step=Math.min(remaining,1/60);remaining-=step;b.time+=step;g.playTime+=step;
     b.globalCooldown=Math.max(0,b.globalCooldown-step);
+    b.shield=Math.max(0,b.shield-step);
     for(const skill of Object.keys(SKILLS)as Skill[])b.cooldowns[skill]=Math.max(0,b.cooldowns[skill]-step);
     if(b.queue.length&&b.globalCooldown<=0){const skill=b.queue.shift()!;execute(g,skill);if(g.phase!=='combat')break;}
     for(const h of g.heroes){
@@ -154,8 +180,8 @@ export function tick(g:Game,dt:number){
         if(e.windup===0){
           e.strikeAt=b.time;const living=g.heroes.map((h,i)=>({h,i})).filter(({h,i})=>h.hp>0&&activeHero(g,i));
           const targets=e.kind==='sentinel'?living:[living.find(({i})=>i===e.target)??living[0]];
-          for(const {h,i}of targets){const amount=Math.max(1,d.attack-(g.campaign?.armor==='warden'?3:0));h.hp=Math.max(0,h.hp-amount);emit(g,'hurt',`−${amount}`,undefined,i);}
-          e.target=g.campaign&&!g.campaign.recruited?0:(e.target+1)%2;e.clock=0;resolve(g);if(g.phase!=='combat')break;
+          for(const {h,i}of targets){const strength=encounterDefinition(b.encounter)?.strength??1;const amount=Math.max(1,Math.round((d.attack*strength-(g.campaign?.armor==='warden'?3:0))*(b.shield>0?.5:1)));h.hp=Math.max(0,h.hp-amount);emit(g,'hurt',`−${amount}`,undefined,i);}
+          b.shield=0;e.target=activeHero(g,1)?(e.target+1)%2:0;e.clock=0;resolve(g);if(g.phase!=='combat')break;
         }
       }else{e.clock+=step;if(e.clock>=d.period){e.windup=d.windup;e.clock=0;}}
     }

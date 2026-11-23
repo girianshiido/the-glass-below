@@ -1,11 +1,11 @@
-import {nearbyResident,nearbyPassage,passageHint,revealRegion,regionOf,regionOffset,sharedOutdoors,entranceAhead,nearbyEntrance,residentApproach} from './region-world.ts';
-import {setupCampaign,activeHero,campaignAction,xpNeeded} from './campaign.ts';
+import {nearbyResident,nearbyPassage,passageHint,revealRegion,regionOf,regionOffset,sharedOutdoors,entranceAhead,nearbyEntrance,residentApproach,estuaryFixture} from './region-world.ts';
+import {setupCampaign,activeHero,campaignAction,xpNeeded,companion,CAMPAIGN_ENCOUNTERS,ESTUARY_STAGE} from './campaign.ts';
 import {ChapterUI,ZONE_NAMES} from './chapter-ui.ts';
 import type {Zone} from './campaign.ts';
 import {checkForUpdate} from './updates.ts';
 import './style.css';
 import './chapter.css';
-import {createGame,encounterDefinition,tick,move,turn,interact,SKILLS,CREATURES,togglePause,useSkill,selectTarget,continueAfterBattle,retreat,livingTarget,visibleEnemy,canUse,skillPower} from './engine.ts';
+import {createGame,encounterDefinition,tick,move,turn,interact,SKILLS,CREATURES,togglePause,useSkill,selectTarget,continueAfterBattle,retreat,livingTarget,visibleEnemy,canUse,skillPower,partySkills} from './engine.ts';
 import type {Point} from './world.ts';
 import type {Game,Skill} from './engine.ts';
 import {CARDINALS,ENCOUNTERS,MAP} from './world.ts';
@@ -19,6 +19,8 @@ import {musicScene} from './audio-state.ts';
 import {CombatEffects} from './effects.ts';
 
 const icons:Record<string,string>={
+ shield:'M12 3 4 6v5c0 5 3 8 8 10 5-2 8-5 8-10V6ZM8 12l3 3 5-6',
+ hook:'M18 4 8 14a4 4 0 1 0 6 6l2-2m-2 0h2v2',
  sound:'M3 9h5l5-4v14l-5-4H3ZM17 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14',
  silent:'M3 9h5l5-4v14l-5-4H3Zm14 0 5 6m0-6-5 6',
  sword:'M5 19 19 5m-5 0h5v5M4 15l5 5m-6 1 3-3',
@@ -84,13 +86,14 @@ motionPreference.addEventListener('change',event=>{reducedMotion=event.matches;}
 document.addEventListener('pointerdown',()=>{void audio.unlock();},{capture:true,passive:true});
 const party=$('party'),skillPanel=$('skills');
 party.innerHTML=game.heroes.map((h,i)=>`<div class="hero hero-${i}" id="hero-${i}"><div class="portrait character-art ${i===0?'kael':'lys'}" aria-hidden="true"><i>${icon(i===0?'sword':'snow')}</i></div><div class="hero-info"><div class="hero-name"><strong>${h.name}</strong><b class="hero-level"></b><span class="xp-readout"></span><span>${i===0?'VANGUARD':'FROSTWEAVER'}</span></div><div class="hero-meter hp"><i></i></div><div class="hero-values"><span class="hp-value"></span><span class="mp-value"></span></div><div class="hero-meter mp"><i></i></div></div></div>`).join('');
-skillPanel.innerHTML=(Object.keys(SKILLS)as Skill[]).map((id,i)=>{const s=SKILLS[id];return `<button class="skill skill-${id}" data-skill="${id}" title="${s.description}" aria-label="${s.name} : ${s.description}"><div class="skill-top">${icon(['sword','snow','heal'][i])}</div><strong>${s.name}</strong><span>${s.cost} MP</span><div class="skill-cooldown"></div><b class="cooldown-label"></b><i class="queued">${icon('check')}</i></button>`;}).join('');
+const skillIcons:Record<Skill,string>={fracture:'sword',frost:'snow',heal:'heal',breakwater:'shield',hook:'hook'};
+skillPanel.innerHTML=(Object.keys(SKILLS)as Skill[]).map(id=>{const s=SKILLS[id];return `<button class="skill skill-${id}" data-skill="${id}" title="${s.description}" aria-label="${s.name} : ${s.description}"><div class="skill-top">${icon(skillIcons[id])}</div><strong>${s.name}</strong><span>${s.cost} MP</span><div class="skill-cooldown"></div><b class="cooldown-label"></b><i class="queued">${icon('check')}</i></button>`;}).join('');
 const chapter=new ChapterUI($('chapter-screen'),()=>game,()=>{persist();ui();},showDialog);
 function enterZone(zone:Zone,from?:Zone){approach=undefined;effects.clear();if(from&&sharedOutdoors(from,zone)){const old=regionOffset(from),next=regionOffset(zone);camera.x+=old.x-next.x;camera.y+=old.y-next.y;}else camera={x:game.position.x,y:game.position.y,yaw:game.direction*Math.PI/2};revealRegion(game);dirtyMap=true;enemyMarkup='';$('enemy-cards').innerHTML='';announceLevel();}
 
 function beginPlaying(){started=true;$('intro').hidden=true;lastTime=performance.now();ui();if(game.campaign&&!game.campaign.introRead){game.campaign.introRead=true;persist();showDialog('A letter without a name',`<p class="chapter-kicker">CHAPTER I · THE BORROWED LIGHT</p><p class="dialog-intro">Kael reaches Greyhaven with a letter in his coat and no memory of who gave it to him. Inside is a single shard of blue glass and seven words:</p><blockquote class="story-quote">When the bell forgets, follow the light.</blockquote><p class="dialog-intro">At the village fountain, an old woman searches the faces of strangers. She seems to be looking for yours.</p><p class="fine">Walk towards the fountain and speak to Elder Elara. Use E or the Interact button when you stand beside her.</p><button class="primary" data-chapter="walk">Enter Greyhaven</button>`);}else announceLevel();}
 let noticeCaption:TimedCaption|null=null,levelCaption:TimedCaption|null=null,lastMessage=game.message;
-function announceLevel(){const title=game.campaign?ZONE_NAMES[game.campaign.zone]:LEVEL_TITLE;$('level-caption').querySelector('h1')!.textContent=title;$('level-caption').querySelector('span')!.textContent=game.campaign?(game.campaign.zone==='crypts'?'BENEATH THE GLASSWORKS':'GREYHAVEN COAST'):'DEPTH I';levelCaption=caption(title,performance.now()/1000,3,2);}
+function announceLevel(){const title=game.campaign?ZONE_NAMES[game.campaign.zone]:LEVEL_TITLE;$('level-caption').querySelector('h1')!.textContent=title;$('level-caption').querySelector('span')!.textContent=game.campaign?(game.campaign.zone==='crypts'?'BENEATH THE GLASSWORKS':game.campaign.zone==='lockworks'?'BENEATH SALTREACH':'GREYHAVEN COAST'):'DEPTH I';levelCaption=caption(title,performance.now()/1000,3,2);}
 function notify(text:string){noticeCaption=text?caption(text,performance.now()/1000):null;}
 function updateCaptions(now:number){
   const notice=$('notice'),level=$('level-caption'),n=captionOpacity(noticeCaption,now),l=captionOpacity(levelCaption,now);
@@ -105,17 +108,32 @@ function ui(){
   app.dataset.phase=game.phase;app.dataset.paused=String(!!b?.paused);app.dataset.started=String(started);
   audio.setScene(musicScene(game,started));audio.setPaused(!!b?.paused);
   $('sound-button').innerHTML=icon(audio.settings.muted?'silent':'sound');$('sound-button').setAttribute('aria-label',audio.settings.muted?'Enable sound':'Mute all sound');$('sound-button').title=audio.settings.muted?'Enable sound':'Mute all sound';
-  const resident=nearbyResident(game,camera),door=nearbyEntrance(game,camera),passage=nearbyPassage(game);$('interact-button').querySelector('span')!.textContent=resident?'Talk · '+resident.name:door?door.id==='inn'?'Enter the inn':'Enter the shop':passage?passageHint(game,passage):'Interact';
+  const resident=nearbyResident(game,camera),door=nearbyEntrance(game,camera),passage=nearbyPassage(game),fixture=estuaryFixture(game,camera);$('interact-button').querySelector('span')!.textContent=resident?'Talk · '+resident.name:door?door.id==='inn'?'Enter the inn':door.id==='shop'?'Enter the shop':'Enter the boathouse':fixture?fixture.label:passage?passageHint(game,passage):'Interact';
   $('heading').textContent=CARDINALS[game.direction];$('compass-face').style.transform=`rotate(${game.direction*90+45}deg)`;
   if(game.message!==lastMessage){lastMessage=game.message;notify(game.message);}
+  const ferrymaster=companion(game)==='neris',secondHero=$('hero-1');
+  secondHero.querySelector('.hero-name strong')!.textContent=game.heroes[1].name;
+  secondHero.querySelector('.hero-name span:last-child')!.textContent=ferrymaster?'FERRYMASTER':'FROSTWEAVER';
+  secondHero.querySelector('.portrait')!.classList.toggle('neris',ferrymaster);
+  secondHero.querySelector('.portrait')!.classList.toggle('lys',!ferrymaster);
+  const availableSkills=partySkills(game);
   for(let i=0;i<2;i++){
     const h=game.heroes[i],card=$(`hero-${i}`);card.hidden=!activeHero(game,i);card.querySelector('.hero-level')!.textContent=c?'Lv '+c.level:'';card.querySelector('.xp-readout')!.textContent=c?c.xp+' / '+xpNeeded(c.level)+' XP':'';card.querySelector<HTMLElement>('.hp i')!.style.width=`${h.hp/h.maxHp*100}%`;card.querySelector<HTMLElement>('.mp i')!.style.width=`${h.mp/h.maxMp*100}%`;
     card.querySelector('.hp-value')!.textContent=`${Math.ceil(h.hp)} / ${h.maxHp} HP`;card.querySelector('.mp-value')!.textContent=`${Math.floor(h.mp)} / ${h.maxMp} MP`;card.classList.toggle('fallen',h.hp<=0);
   }
   for(const id of Object.keys(SKILLS)as Skill[]){
     const button=document.querySelector<HTMLButtonElement>(`[data-skill="${id}"]`)!,s=SKILLS[id],cd=b?.cooldowns[id]??0;
-    const description=id==='heal'?`Restores ${skillPower(game,id)} HP to the most wounded ally.`:`Deals ${skillPower(game,id)} damage. ${id==='frost'?'Interrupts and freezes for 2 seconds.':'Interrupts the target.'}`;button.title=`${s.name} · ${s.cost} MP · ${game.heroes[s.hero].name}\n${description}\nShortcut: ${Object.keys(SKILLS).indexOf(id)+1}`;button.setAttribute('aria-label',`${s.name}, ${s.cost} MP, ${game.heroes[s.hero].name}. ${description}`);
-    button.hidden=!activeHero(game,s.hero);button.disabled=!canUse(game,id,!b?.paused);
+    const description=id==='heal'?`Restores ${skillPower(game,id)} HP to the most wounded ally.`
+      :id==='frost'?`Deals ${skillPower(game,id)} damage. Interrupts and freezes for 2 seconds.`
+      :id==='fracture'?`Deals ${skillPower(game,id)} damage and interrupts the target.`
+      :id==='hook'?`Deals ${skillPower(game,id)} damage. The next Fracture hits 50% harder.`:s.description;
+    const shortcut=availableSkills.indexOf(id)+1;
+    button.title=`${s.name} · ${s.cost} MP · ${game.heroes[s.hero].name}
+${description}
+Shortcut: ${shortcut}`;
+    button.setAttribute('aria-label',`${s.name}, ${s.cost} MP, ${game.heroes[s.hero].name}. ${description}`);
+    button.hidden=shortcut===0;
+    button.disabled=!canUse(game,id,!b?.paused);
     button.classList.toggle('is-queued',!!b?.queue.includes(id));button.style.setProperty('--cooldown',`${cd/s.cooldown*100}%`);button.querySelector('.cooldown-label')!.textContent=cd>0?`${cd.toFixed(1)} s`:'';
   }
   $('pause-button').innerHTML=`${icon(b?.paused?'play':'pause')}<span>${b?.paused?'Resume':'Pause'}</span><kbd>Space</kbd>`;
@@ -150,7 +168,7 @@ function updateEnemies(){
   card.querySelector('.enemy-name')!.textContent=e.name;
   card.querySelector('.target-label')!.textContent=`${Math.ceil(e.hp)} / ${e.maxHp}`;
   card.querySelector<HTMLElement>('.enemy-hp i')!.style.width=`${e.hp/e.maxHp*100}%`;
-  card.querySelector('p')!.textContent=e.hp<=0?'Defeated':e.stunned>0?(e.frozen?'Frozen':'Staggered'):e.windup>0?`${d.skill} · ${e.kind==='sentinel'?'Party':game.heroes[e.target].name}`:'';
+  card.querySelector('p')!.textContent=e.hp<=0?'Defeated':e.stunned>0?(e.frozen?'Frozen':'Staggered'):e.windup>0?`${d.skill} · ${e.kind==='sentinel'?'Party':game.heroes[e.target].name}`:b.exposed?'Exposed':'';
   card.querySelector<HTMLElement>('.intent-meter i')!.style.width=`${e.windup>0?(1-e.windup/d.windup)*100:e.clock/d.period*100}%`;
 
 }
@@ -162,7 +180,7 @@ function updateOutcome(){
 }
 function act(action:string){
   if(!ready||!started||dialog.open||game.phase!=='explore')return;
-  if(action==='interact'){const resident=nearbyResident(game,camera);if(resident){chapter.action(resident.id);return;}const door=nearbyEntrance(game,camera);if(door){chapter.action(door.id);return;}}
+  if(action==='interact'){const resident=nearbyResident(game,camera);if(resident){chapter.action(resident.id);return;}const door=nearbyEntrance(game,camera);if(door){chapter.action(door.id);return;}const fixture=estuaryFixture(game,camera);if(fixture){chapter.action(fixture.id);return;}}
   if(action==='forward'){const door=entranceAhead(game,camera);if(door){chapter.action(door.id);return;}}
   if(transition>.03)return;
   const zone=game.campaign?.zone,before=game.phase,position={...game.position},hadKey=game.key,gateWasOpen=game.gateOpen,shrineWasUsed=game.shrineUsed;
@@ -184,8 +202,8 @@ function openMap(){
   showDialog(game.campaign?ZONE_NAMES[game.campaign.zone]:'The Glass Crypts',`<p class="dialog-intro">${objective(game)}</p><canvas id="full-map" aria-label="Map of discovered areas"></canvas><div class="map-legend"><span><i class="legend-player"></i>Party</span><span><i class="legend-enemy"></i>Enemy</span><span><i class="legend-key"></i>Chest</span><span><i class="legend-source"></i>Spring</span></div><p class="fine">${game.gold} shards · ${game.cleared.size} encounters cleared${game.key?' · Copper key':''}</p>`);
   requestAnimationFrame(()=>drawMap($<HTMLCanvasElement>('full-map'),game,true));
 }
-function openHelp(){showDialog('Field guide',`<div class="guide"><h3>Explore</h3><p>Move one tile at a time and turn through 90°. Walk through village squares, forest clearings and furnace halls. Move forward to approach a resident, then use E when you are close enough. Open the eastern village gate before leaving. Doors and stairways are part of the scenery. Reach a shop or inn doorstep, then walk forward again to enter. Creatures are visible ahead. On the woodland trail, nearby creatures engage even when you approach from the side.</p><p><b>Keyboard:</b> W / Z or ↑ to move forward, S or ↓ to move backward, ← / → to turn, A / Q and D to step sideways. E to interact, M for the map. All actions also have touch controls.</p><h3>Fight</h3><p>Kael and Lys attack automatically. Use the three skills with their buttons or keys <b>1, 2 and 3</b>. Each encounter has one opponent at full size. Defeat it to clear the passage.</p><p><b>Space pauses combat.</b> Queue one skill per hero while paused. A new order replaces that hero’s previous order. MP is spent only when the action executes after resuming. Skills are separated by 0.65 seconds. Selecting a queued skill again cancels it.</p><h3>Read enemy intentions</h3><p>An amber enemy card signals an incoming attack. Fracture and Frost Shard interrupt it. The Warden can strike the entire party.</p><h3>Patrols</h3><p>Three cleared corridors can receive a new patrol after 20 seconds away, only when you are outside the sector and cannot see the site. At most one returning patrol per area is present. The Warden never returns. Returning patrols grant 10 shards, 6 HP and 4 MP per hero.</p><h3>Survive</h3><p>Each victory restores 18 HP and 10 MP. The spring fully restores the party once. Retreat returns you to the entrance with your current health. After defeat, you can resume the last saved checkpoint.</p><p class="fine">Music and sound effects can be adjusted in the menu.</p></div>`);}
-function openMenu(){showDialog('Expedition',`<div class="menu-stack"><p class="dialog-intro">${objective(game)}</p><p class="expedition-stats">${game.gold} shards · ${game.cleared.size} / ${game.campaign?10:ENCOUNTERS.length} encounters cleared</p><button class="secondary" data-menu="check-update" id="check-update-button">Check for updates</button><p id="update-status" class="update-status" role="status" aria-live="polite"></p><button class="secondary" data-menu="update" id="update-button" hidden>Apply update</button><div class="sound-settings"><label class="sound-toggle">Mute all sound<input id="mute-setting" type="checkbox" ${audio.settings.muted?'checked':''}></label><label class="sound-slider">Music<input id="music-setting" type="range" min="0" max="100" value="${Math.round(audio.settings.music*100)}"></label><label class="sound-slider">Sound effects<input id="effects-setting" type="range" min="0" max="100" value="${Math.round(audio.settings.effects*100)}"></label></div><button class="secondary" data-menu="help">Field guide</button><button class="secondary" data-menu="title">Return to title</button>${game.phase==='combat'?'<button class="secondary" data-menu="ask-retreat">Retreat to the entrance</button>':''}<button class="secondary" data-menu="export">Export save</button><button class="secondary" data-menu="import">Import save</button><button class="secondary" data-menu="install" id="install-button" hidden>Install game</button><button class="danger-button" data-menu="new">New expedition</button><span class="fine">${GAME_TITLE} · Chapter I · 2.1.1 · Greyhaven revised</span></div>`);if(installPrompt)$('install-button').hidden=false;if(waitingWorker)$('update-button').hidden=false;}
+function openHelp(){showDialog('Field guide',`<div class="guide"><h3>Explore</h3><p>Move one tile at a time and turn through 90°. Walk through village squares, forest clearings and furnace halls. Move forward to approach a resident, then use E when you are close enough. Open the eastern village gate before leaving. Doors and stairways are part of the scenery. Reach a shop or inn doorstep, then walk forward again to enter. Creatures are visible ahead. On the woodland trail, nearby creatures engage even when you approach from the side.</p><p><b>Keyboard:</b> W / Z or ↑ to move forward, S or ↓ to move backward, ← / → to turn, A / Q and D to step sideways. E to interact, M for the map. All actions also have touch controls.</p><h3>Fight</h3><p>Active party members attack automatically. Use their skills with the on-screen buttons or keys <b>1, 2 and 3</b>. Each encounter has one opponent at full size. Defeat it to clear the passage.</p><p><b>Space pauses combat.</b> Queue one skill per hero while paused. A new order replaces that hero’s previous order. MP is spent only when the action executes after resuming. Skills are separated by 0.65 seconds. Selecting a queued skill again cancels it.</p><h3>Read enemy intentions</h3><p>An amber enemy card signals an incoming attack. Fracture and Frost Shard interrupt it. The Warden can strike the entire party.</p><h3>Patrols</h3><p>Cleared sectors can receive new patrols after 20 seconds away and out of sight. Up to two patrols can return per campaign area. Bosses stay defeated. Returning patrols grant 10 shards, 6 HP and 4 MP per hero.</p><h3>Survive</h3><p>Each victory restores 18 HP and 10 MP. The spring fully restores the party once. Retreat returns you to the entrance with your current health. After defeat, you can resume the last saved checkpoint.</p><p class="fine">Music and sound effects can be adjusted in the menu.</p></div>`);}
+function openMenu(){showDialog('Expedition',`<div class="menu-stack"><p class="dialog-intro">${objective(game)}</p><p class="expedition-stats">${game.gold} shards · ${game.cleared.size} / ${game.campaign?CAMPAIGN_ENCOUNTERS.length:ENCOUNTERS.length} encounters cleared</p><button class="secondary" data-menu="check-update" id="check-update-button">Check for updates</button><p id="update-status" class="update-status" role="status" aria-live="polite"></p><button class="secondary" data-menu="update" id="update-button" hidden>Apply update</button><div class="sound-settings"><label class="sound-toggle">Mute all sound<input id="mute-setting" type="checkbox" ${audio.settings.muted?'checked':''}></label><label class="sound-slider">Music<input id="music-setting" type="range" min="0" max="100" value="${Math.round(audio.settings.music*100)}"></label><label class="sound-slider">Sound effects<input id="effects-setting" type="range" min="0" max="100" value="${Math.round(audio.settings.effects*100)}"></label></div><button class="secondary" data-menu="help">Field guide</button><button class="secondary" data-menu="title">Return to title</button>${game.phase==='combat'?'<button class="secondary" data-menu="ask-retreat">Retreat to the entrance</button>':''}<button class="secondary" data-menu="export">Export save</button><button class="secondary" data-menu="import">Import save</button><button class="secondary" data-menu="install" id="install-button" hidden>Install game</button><button class="danger-button" data-menu="new">New expedition</button><span class="fine">${GAME_TITLE} · ${(game.campaign?.stage??0)>=ESTUARY_STAGE.alone?'Chapter III':(game.campaign?.stage??0)>=ESTUARY_STAGE.trail?'Chapter II':'Chapter I'} · 2.2.0</span></div>`);if(installPrompt)$('install-button').hidden=false;if(waitingWorker)$('update-button').hidden=false;}
 
 app.addEventListener('click',event=>{
   const button=(event.target as Element).closest<HTMLButtonElement>('button');if(!button||button.disabled)return;
@@ -248,7 +266,7 @@ document.addEventListener('keydown',event=>{
   if(event.repeat&&[' ','1','2','3','m'].includes(key))return;
   if(key===' '){togglePause(game);ui();return;}
   if(key==='m'){openMap();return;}
-  if(['1','2','3'].includes(key)){useSkill(game,(['fracture','frost','heal']as Skill[])[Number(key)-1]);ui();return;}
+  if(['1','2','3'].includes(key)){const skill=partySkills(game)[Number(key)-1];if(skill)useSkill(game,skill);ui();return;}
   if(key==='tab'&&game.phase==='combat'){const target=livingTarget(game);if(target)selectTarget(game,target.id);ui();return;}
   const actions:Record<string,string>={arrowup:'forward',z:'forward',w:'forward',arrowdown:'back',s:'back',arrowleft:'turnLeft',arrowright:'turnRight',q:'left',a:'left',d:'right',e:'interact'};
   if(actions[key]){event.preventDefault();act(actions[key]);}

@@ -52,3 +52,24 @@
 #app[data-campaign=true] .skill{padding:10px 12px;min-height:84px}#app[data-campaign=true] .skill strong{font-size:14px;line-height:1.15;overflow-wrap:normal}#app[data-campaign=true] .skill>span{font-size:11px}.skill-top svg{width:22px;height:22px}.skill-top{margin-bottom:5px}
 @media(max-width:760px){#app[data-campaign=true][data-phase=combat] .control-deck{grid-template-columns:minmax(0,1fr);grid-template-areas:'party' 'actions' 'nav'}#app[data-campaign=true][data-phase=combat] .party{flex-direction:row}#app[data-campaign=true][data-phase=combat] .hero{flex:1;min-width:0}#app[data-campaign=true] .skill{padding:9px;min-height:80px}.combat-tools{justify-content:flex-start}.pause-button{flex:none;font-size:13px}.combat-tools .text-button{font-size:12px}}
 @media(orientation:landscape) and (max-height:500px){#app[data-campaign=true] .skill{min-height:44px;padding:5px 8px}#app[data-campaign=true] .skill strong{font-size:12px}#app[data-campaign=true] .skill>span{font-size:10px}.combat-tools{display:grid;grid-template-columns:minmax(0,1fr) 44px;gap:5px}.pause-button{padding:5px;font-size:12px;gap:5px}.pause-button svg{width:15px}.combat-tools .text-button{display:block;grid-column:1/-1;padding:4px;min-height:44px}.skill-top{margin:0}.skill-top svg{width:18px;height:18px}}
+
+.service-neris{background-image:url('../public/art/neris-boathouse.webp')}
+.character-art.neris{background:center 30%/cover no-repeat url('../public/art/neris.webp')}
+.skill-breakwater{border-top-color:#92aab5!important;background:linear-gradient(145deg,#314c59,#132f3b)}
+.skill-hook{border-top-color:#bca777!important;background:linear-gradient(145deg,#594c35,#20323b)}
+.skill-breakwater svg{color:#b8dde7}
+.skill-hook svg{color:#e5c28c}
+.region-map.expanded .road{left:17%;top:24%}
+.region-node.estuary{left:43%;top:6%}
+.region-node.lockworks{right:3%;top:22%}
+.region-node.current{border-color:#e6cc8e}
+@media(max-width:500px){
+  .region-map.expanded .village{left:4%;top:50%}
+  .region-map.expanded .road{left:4%;top:23%}
+  .region-map.expanded .estuary{left:auto;right:4%;top:3%}
+  .region-map.expanded .lockworks{right:4%;top:24%}
+  .region-map.expanded .works{right:4%;top:53%}
+  .region-map.expanded .crypts{right:4%;bottom:4%}
+  .region-map.expanded .region-node{max-width:48%;padding:6px}
+  .region-map.expanded .region-node b{font-size:14px}
+}

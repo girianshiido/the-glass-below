@@ -9,6 +9,7 @@ import {drawThinImpact} from './impact-art.ts';
 export interface EffectSpec {cell:number;duration:number;sound:Sound;rotation:number;art:'stroke'|'spell'}
 export function effectFor(f:Feedback):EffectSpec{
   if(f.kind==='ice')return{cell:4,duration:.95,sound:'frost',rotation:0,art:'spell'};
+  if(f.kind==='guard')return{cell:5,duration:.75,sound:'heal',rotation:0,art:'spell'};
   if(f.kind==='heal')return{cell:5,duration:1.1,sound:'heal',rotation:0,art:'spell'};
   if(f.kind==='break')return{cell:6,duration:.4,sound:'fracture',rotation:0,art:'stroke'};
   if(f.kind==='hurt')return{cell:7,duration:.32,sound:'hit',rotation:(f.id%3-1)*13,art:'stroke'};
@@ -16,6 +17,7 @@ export function effectFor(f:Feedback):EffectSpec{
 }
 /** Project impacts onto the creature, independent of viewport aspect ratio. */
 export function impactAnchor(g:Game,camera:Camera,width:number,height:number,f:Feedback,insets:CombatInsets=DEFAULT_INSETS){
+  if(f.kind==='guard')return{x:50,y:68};
   if(f.hero!==undefined)return{x:f.hero===0?28:72,y:f.kind==='heal'?78:70};
   const encounter=g.battle?encounterDefinition(g.battle.encounter):undefined;if(!encounter)return{x:50,y:52};
   const place=g.campaign&&g.battle?battlePosition(g.position,encounter,g.battle.time):encounter;
@@ -50,7 +52,7 @@ export class CombatEffects {
       if(t>=1){this.remove(fx);this.active.splice(i,1);continue;}
       const attack=Math.min(1,t/.11),fade=t>.48?Math.pow((1-t)/.52,1.3):1;
       const scale=1;
-      if(fx.context&&fx.spec.art==='spell')drawSpell(fx.context,fx.kind==='heal'?'heal':'ice',t,fx.size,reduced);
+      if(fx.context&&fx.spec.art==='spell')drawSpell(fx.context,fx.kind==='heal'?'heal':fx.kind==='guard'?'guard':'ice',t,fx.size,reduced);
       if(fx.context&&fx.spec.art==='stroke')drawThinImpact(fx.context,fx.variant,t,fx.size,fx.kind==='break'?'break':fx.kind==='hurt'?'hurt':'hit',!reduced);
       fx.element.style.opacity=String(fx.spec.art==='stroke'?attack:attack*fade);fx.element.style.transform=`translate(-50%,-50%) rotate(${fx.spec.rotation}deg) scale(${scale})`;
       fx.number.style.opacity=String(Math.min(1,t*8)*Math.min(1,(1-t)*3));fx.number.style.transform=`translate(-50%,${reduced?-20:-10-t*65}px)`;

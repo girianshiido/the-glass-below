@@ -1,9 +1,10 @@
+import {MOORING,SLUICE_WHEEL,TIDE_GATE} from '../src/estuary-world.ts';
 import {CRYPT_TORCHES} from '../src/scene-lights.ts';
 import {forestTrees,CELL} from '../src/region-geometry.ts';
 import {test} from 'node:test';import assert from 'node:assert/strict';
-import {createGame,move,interact,turn,useSkill,continueAfterBattle} from '../src/engine.ts';
-import {setupCampaign,campaignAction,ROAD_ENCOUNTERS} from '../src/campaign.ts';
-import {REGION_WORLDS,regionOf,regionWall,nearbyResident,regionSight,regionOffset,sharedOutdoors,entranceAhead,nearbyEntrance,entrancePoint,residentApproach,INTERACTION_REACH,RESIDENT_STOP_DISTANCE,trailCoverage} from '../src/region-world.ts';
+import {createGame,move,interact,turn,useSkill,continueAfterBattle,partySkills} from '../src/engine.ts';
+import {setupCampaign,campaignAction,ROAD_ENCOUNTERS,companion,travel} from '../src/campaign.ts';
+import {REGION_WORLDS,regionOf,regionWall,nearbyResident,regionSight,regionOffset,sharedOutdoors,entranceAhead,nearbyEntrance,entrancePoint,residentApproach,INTERACTION_REACH,RESIDENT_STOP_DISTANCE,trailCoverage,estuaryFixture} from '../src/region-world.ts';
 import {DIRECTIONS,CHEST,GATE} from '../src/world.ts';
 import {serialize,deserialize} from '../src/save.ts';
 const same=(a,b)=>a.x===b.x&&a.y===b.y;
@@ -51,3 +52,64 @@ test('Talking requires a short physical approach from every accessible side, inc
 test('Close interactions respect walls, building fronts, recruitment and combat state',()=>{const g=setupCampaign(createGame());const door=REGION_WORLDS.village.entrances[1];g.position={x:door.x,y:door.y-1};assert.equal(nearbyEntrance(g),undefined);g.campaign.zone='glassworks';g.campaign.recruited=true;g.position={x:18,y:2};g.direction=1;assert.equal(residentApproach(g),undefined);g.campaign.zone='village';g.phase='combat';g.position={x:4,y:8};assert.equal(nearbyEntrance(g),undefined);assert.equal(nearbyResident(g,{x:9,y:6.4}),undefined);assert.equal(residentApproach(g),undefined);});
 
 test('Sideways and backward movement can make the same final approach as walking forward',()=>{const g=setupCampaign(createGame());g.position={x:9,y:7};g.direction=3;const forward=residentApproach(g);g.direction=0;assert.deepEqual(residentApproach(g,-1),forward);g.direction=2;assert.deepEqual(residentApproach(g,1),forward);g.direction=1;assert.deepEqual(residentApproach(g,2),forward);});
+
+test('An existing chapter-one save can reach Saltreach, drain the lock, meet the Keeper, depart and recruit',()=>{
+ const saved=setupCampaign(createGame());
+ Object.assign(saved.campaign,{stage:7,recruited:true,introRead:true,villageGateOpen:true,weapon:'tempered',level:5});
+ saved.cleared=new Set(['road-shards','road-hollow','road-lantern','furnace','guardian']);
+ saved.gold=163;
+ saved.heroes[0].hp=127;
+ const resume=state=>{const restored=deserialize(serialize(state));assert(restored);return restored;};
+ let g=resume(saved);
+ assert.equal(g.campaign.weapon,'tempered');
+ assert.equal(g.heroes[0].hp,127);
+ assert.equal(g.gold,163);
+ assert.equal(companion(g),'lys');
+ assert(!travel(g,'estuary'));
+ assert(campaignAction(g,'follow-bell'));
+ go(g,{x:19,y:8});g.direction=0;interact(g);
+ assert.equal(g.campaign.zone,'road');
+ go(g,{x:11,y:8});g.direction=3;assert(move(g,0));
+ assert.equal(g.campaign.zone,'estuary');
+ assert(!campaignAction(g,'drain-lock'));
+
+ go(g,{x:11,y:10});g.direction=3;assert.equal(entranceAhead(g),undefined);
+ assert(move(g,0));
+ assert.equal(entranceAhead(g).id,'neris');
+ assert(campaignAction(g,'meet-neris'));
+ go(g,{x:21,y:6});interact(g);
+ assert.equal(g.campaign.zone,'estuary','Water prevents use of the stairhead');
+ go(g,SLUICE_WHEEL);
+ assert.equal(estuaryFixture(g).id,'drain-lock');
+ assert(campaignAction(g,'drain-lock'));
+ go(g,{x:21,y:6});interact(g);
+ assert.equal(g.campaign.zone,'lockworks');
+ assert.equal(companion(g),'lys');
+ assert.deepEqual(partySkills(g),['fracture','frost','heal']);
+
+ go(g,{x:13,y:2});
+ if(!g.cleared.has('bell-keeper')){g.direction=1;turn(g,1);if(g.phase==='combat')win(g);}
+ assert(g.cleared.has('bell-keeper'));
+ assert(!g.campaign.bellShortcut);
+ go(g,{x:13,y:1});g.direction=0;assert(move(g,0));
+ assert.equal(g.campaign.zone,'estuary');
+ assert.equal(g.campaign.bellShortcut,true);
+ assert.equal(companion(g),'lys');
+ go(g,MOORING);
+ assert.equal(estuaryFixture(g).id,'part-ways');
+ assert(campaignAction(g,'part-ways'));
+ g=resume(g);
+ assert.equal(companion(g),undefined);
+ assert.deepEqual(partySkills(g),['fracture']);
+ assert(!campaignAction(g,'sail-with-neris'));
+ go(g,TIDE_GATE);
+ assert(g.cleared.has('tide-stray'));
+ assert(campaignAction(g,'secure-tide'));
+ go(g,{x:11,y:9});
+ assert(campaignAction(g,'sail-with-neris'));
+ g=resume(g);
+ assert.equal(companion(g),'neris');
+ assert.equal(g.heroes[1].name,'Neris');
+ assert.deepEqual(partySkills(g),['fracture','breakwater','hook']);
+ assert.equal(g.campaign.weapon,'tempered');
+});

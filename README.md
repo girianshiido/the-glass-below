@@ -18,7 +18,7 @@ Kael reaches Greyhaven with a letter he does not remember receiving. The village
 - Automatic attacks, manual Fracture, Frost Shard and Mending Seal; tactical pause queues one order per hero, with ×1 / ×2 speed. Spell costs and current power are visible in their descriptions.
 - Compact responsive skill buttons show icons, names and MP costs; detailed descriptions and shortcuts remain in tooltips and the party sheet.
 - Animated blade strokes, impact ripples, a gathering frost sigil with converging shards, and healing rings with rising motes. Effects freeze with tactical pause and respect reduced motion.
-- Six original music loops: title, village, road, crypt exploration, battle and boss. All are rendered with **FluidSynth + MuseScore General HQ**, stereo 48 kHz, in **OGG and AAC**. Sixteen sound effects, including six soft, alternating stone/earth footsteps, independent volume levels, global mute and background suspension remain supported.
+- Seven original music loops: title, village, road, estuary, crypt exploration, battle and boss. All are rendered with **FluidSynth + MuseScore General HQ**, stereo 48 kHz, in **OGG and AAC**. Sixteen sound effects, including six soft, alternating stone/earth footsteps, independent volume levels, global mute and background suspension remain supported.
 - A permanent **Check for updates** menu button. A downloaded version is activated only through **Apply update**.
 
 ### Start or resume
@@ -33,9 +33,15 @@ The chapter has a complete quest route: clear the road, optionally report to Ela
 
 ![Inside the glassworks](docs/world-glassworks.jpg)
 
+## Chapter II — The Drowned Bell
+
+After returning the memory prism, speak to Elder Elara. The coastal arch on Old Pine Road leads to Saltreach, a hamlet linked by causeways, wharves and a bell tower. Meet Neris inside her boathouse, drain the old lock and follow the bell beneath the quay. Unbolt the tower door from inside to open the return route. The chapter continues from existing saves with the same equipment and progression.
+
+Lys stays with Kael through the Drowned Lock. The opening of Chapter III includes a solo expedition along the lower quay and Neris joining the party. Her Breakwater halves one incoming strike. Hook Feint deals damage and increases the next Fracture's damage by 50%. The new estuary score is rendered from MIDI with FluidSynth and MuseScore General HQ, in OGG and AAC.
+
 ## Returning patrols
 
-Cleared sectors can repopulate after **20 seconds of active play outside the sector and out of sight**. Nearby or visible sites do not spawn a replacement. Each area allows at most one returning patrol, so a distant crypt patrol does not prevent the road from repopulating. The three road sites and three ordinary crypt sites are eligible; the furnace encounter and Warden never return. Returning patrols grant reduced rewards (10 shards, 6 HP and 4 MP each, plus 12 party XP), and never undo quest completion. Pauses, dialogs and backgrounded tabs stop active time.
+Old Pine Road has five initial encounters. Three still count towards Elara's commission. The glassworks has two new threats along its side aisles. Ordinary sites can repopulate after **20 seconds of active play outside the sector and out of sight**. Up to two returning patrols can be active in each campaign area independently. Story encounters stay cleared and returning patrols never undo quest progress. They grant reduced rewards of 10 shards, 12 XP, and 6 HP and 4 MP per active hero.
 
 ## Controls
 
@@ -47,7 +53,7 @@ Cleared sectors can repopulate after **20 seconds of active play outside the sec
 | Interact | E |
 | Local discovered map | M |
 | Pause / resume combat | Space |
-| Fracture / Frost Shard / Mending Seal | 1 / 2 / 3 |
+| Active party skills | 1 / 2 / 3 |
 
 The outdoor road is a narrow path with small clearings. Visible monsters engage within reach even from the side, so the road encounters cannot be bypassed. Engaged creatures visibly approach melee distance; impacts and framing follow the approach. There are no invisible random encounters. Walk through the eastern village gate to reach the road, enter the distant glassworks facade, and find the stairs in the north-east corner of its great hall. Ten visible, animated wall torches light the darker crypt. Open handrails leave the entry view clear. The entrance stairs provide a return route; the Warden chamber has another staircase. The Region button provides an overview. Retreat preserves HP/MP and resets undefeated opponents. Combat saves resume at the encounter checkpoint rather than mid-animation.
 

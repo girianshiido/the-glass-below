@@ -1,9 +1,10 @@
+import {ESTUARY_STAGE,ESTUARY,LOCKWORKS,ROAD_TO_ESTUARY,SLUICE_WHEEL,MOORING,TIDE_GATE} from './estuary-world.ts';
 import type {Zone} from './campaign.ts';
 import type {Game} from './engine.ts';
 import {MAP as OLD_MAP,ENCOUNTERS as OLD_ENCOUNTERS,DIRECTIONS} from './world.ts';
 import type {Point,EncounterDef} from './world.ts';
 export interface Building{x:number;y:number;w:number;d:number;h:number;roof:number;kind:'inn'|'shop'|'house'|'hall'|'factory'|'tower'}
-export interface Entrance extends Point{id:'inn'|'shop';direction:number}
+export interface Entrance extends Point{id:'inn'|'shop'|'neris';direction:number}
 export interface Resident extends Point{id:'elara'|'inn'|'shop'|'lys';name:string;frame:number}
 export interface Passage extends Point{id:string;to:Zone;spawn:Point;direction:number;label:string}
 export interface RegionWorld{zone:Zone;map:string[];spawn:Point;direction:number;buildings:Building[];residents:Resident[];entrances:Entrance[];passages:Passage[];encounters:EncounterDef[];ceiling:number;outdoor:boolean}
@@ -16,7 +17,7 @@ export const VILLAGE_DETAILS=[[10,8],[8,8],[12,8],[7,9],[13,9]]as const;
 village[8][20]='.';for(const[x,y]of VILLAGE_DETAILS)village[y][x]='#';
 // A narrow woodland trail, with small clearings and connected steps at its bends.
 let previous=10;for(let x=0;x<25;x++){const center=x<9?10:x<17?10-Math.floor((x-8)/2):6;for(let y=Math.min(previous,center);y<=Math.max(previous,center);y++)road[y][x]='.';if(x<4)for(let y=9;y<=11;y++)road[y][x]='.';previous=center;}
-rect(road,10,8,3,3,'.');rect(road,18,5,3,3,'.');road[10][0]='.';road[6][24]='.';
+rect(road,10,8,3,3,'.');rect(road,18,5,3,3,'.');road[10][0]='.';road[6][24]='.';road[ROAD_TO_ESTUARY.y][ROAD_TO_ESTUARY.x]='.';
 // Broad furnace and workshop halls, with a traversable opening between their columns.
 rect(works,3,4,4,4);rect(works,16,4,4,4);rect(works,3,12,4,3);rect(works,17,12,3,3);
 for(const [x,y]of [[9,5],[13,5],[9,12],[13,12]])works[y][x]='#';
@@ -29,9 +30,10 @@ for(let x=11;x<=16;x++){crypt[9][x]='#';crypt[13][x]='#';}for(let y=10;y<=13;y++
 const finish=(m:string[][])=>m.map(r=>r.join(''));
 export const REGION_WORLDS:Record<Zone,RegionWorld>={
  village:{zone:'village',map:finish(village),spawn:{x:10,y:11},direction:3,buildings,residents:[{id:'elara',name:'Elder Elara',frame:0,x:9,y:6}],entrances:[{id:'inn',x:4,y:8,direction:3},{id:'shop',x:16,y:11,direction:3}],passages:[{id:'pine-gate',x:20,y:8,to:'road',spawn:{x:0,y:10},direction:0,label:'Old Pine Road'}],encounters:[],ceiling:0,outdoor:true},
- road:{zone:'road',map:finish(road),spawn:{x:1,y:10},direction:0,buildings:[],residents:[],entrances:[],passages:[{id:'village-return',x:0,y:10,to:'village',spawn:{x:20,y:8},direction:2,label:'Greyhaven'},{id:'glassworks-door',x:24,y:6,to:'glassworks',spawn:{x:11,y:16},direction:3,label:'Enter the glassworks'}],encounters:[{id:'road-shards',x:6,y:10,kind:'scavenger'},{id:'road-hollow',x:13,y:8,kind:'scavenger'},{id:'road-lantern',x:20,y:6,kind:'wraith'}],ceiling:0,outdoor:true},
- glassworks:{zone:'glassworks',map:finish(works),spawn:{x:11,y:16},direction:3,buildings:[],residents:[{id:'lys',name:'Lys',frame:3,x:18,y:3}],entrances:[],passages:[{id:'works-return',x:11,y:18,to:'road',spawn:{x:23,y:6},direction:2,label:'Old Pine Road'},{id:'crypt-stairs',x:19,y:0,to:'crypts',spawn:{x:1,y:1},direction:0,label:'Descend into the crypts'}],encounters:[{id:'furnace',kind:'wraith',x:11,y:7}],ceiling:6.5,outdoor:false},
+ road:{zone:'road',map:finish(road),spawn:{x:1,y:10},direction:0,buildings:[],residents:[],entrances:[],passages:[{id:'village-return',x:0,y:10,to:'village',spawn:{x:20,y:8},direction:2,label:'Greyhaven'},{id:'glassworks-door',x:24,y:6,to:'glassworks',spawn:{x:11,y:16},direction:3,label:'Enter the glassworks'},{id:'estuary-arch',...ROAD_TO_ESTUARY,to:'estuary',spawn:{x:1,y:12},direction:0,label:'Follow the causeway to Saltreach'}],encounters:[{id:'road-shards',x:6,y:10,kind:'scavenger'},{id:'road-hollow',x:13,y:8,kind:'scavenger'},{id:'road-lantern',x:20,y:6,kind:'wraith'},{id:'pine-root',x:9,y:10,kind:'scavenger'},{id:'pine-bend',x:17,y:6,kind:'scavenger'}],ceiling:0,outdoor:true},
+ glassworks:{zone:'glassworks',map:finish(works),spawn:{x:11,y:16},direction:3,buildings:[],residents:[{id:'lys',name:'Lys',frame:3,x:18,y:3}],entrances:[],passages:[{id:'works-return',x:11,y:18,to:'road',spawn:{x:23,y:6},direction:2,label:'Old Pine Road'},{id:'crypt-stairs',x:19,y:0,to:'crypts',spawn:{x:1,y:1},direction:0,label:'Descend into the crypts'}],encounters:[{id:'furnace',kind:'wraith',x:11,y:7},{id:'kiln-crawler',kind:'scavenger',x:7,y:10},{id:'loading-bay',kind:'wraith',x:20,y:10}],ceiling:6.5,outdoor:false},
  crypts:{zone:'crypts',map:finish(crypt),spawn:{x:1,y:1},direction:0,buildings:[],residents:[],entrances:[],passages:[{id:'crypt-return',x:1,y:1,to:'glassworks',spawn:{x:19,y:1},direction:1,label:'Climb to the glassworks'},{id:'warden-stairs',x:17,y:13,to:'glassworks',spawn:{x:19,y:1},direction:1,label:'Climb to the glassworks'}],encounters:OLD_ENCOUNTERS.map(e=>({...e})),ceiling:4.3,outdoor:false},
+ estuary:ESTUARY, lockworks:LOCKWORKS,
 };
 export function regionOf(g:Game){return REGION_WORLDS[g.campaign?.zone??'crypts'];}
 export function regionWall(zone:Zone,x:number,y:number){return REGION_WORLDS[zone].map[y]?.[x]!=='.';}
@@ -47,8 +49,43 @@ export function nearbyResident(g:Game,origin:Point=g.position){if(!g.campaign||g
 /** One final, short approach lets the player reach a person without occupying their cell. */
 export function residentApproach(g:Game,relative=0):Point|undefined{if(!g.campaign||g.phase!=='explore')return;const[dx,dy]=DIRECTIONS[(g.direction+relative+4)%4],n=activeResidents(g).find(n=>n.x===g.position.x+dx&&n.y===g.position.y+dy);if(!n||!regionSight(g.campaign.zone,g.position,n,g.gateOpen))return;return{x:n.x-dx*RESIDENT_STOP_DISTANCE/CELL_METRES,y:n.y-dy*RESIDENT_STOP_DISTANCE/CELL_METRES};}
 export function nearbyPassage(g:Game){if(!g.campaign||g.phase!=='explore')return undefined;return regionOf(g).passages.find(p=>Math.abs(p.x-g.position.x)+Math.abs(p.y-g.position.y)<=1);}
-export function passageLocked(g:Game,p:Passage){const c=g.campaign;if(!c)return false;if(p.id==='pine-gate')return c.stage<1||!c.villageGateOpen||c.gateOpenedAt!==undefined&&g.playTime-c.gateOpenedAt<.9;if(p.id==='glassworks-door')return c.stage<2;if(p.id==='crypt-stairs')return !c.recruited;return false;}
-export function passageHint(g:Game,p:Passage){if(p.id==='pine-gate'&&g.campaign!.stage<1)return 'Speak to Elder Elara before leaving Greyhaven.';if(p.id==='pine-gate'&&!g.campaign!.villageGateOpen)return 'Open the pine gate';if(p.id==='pine-gate'&&g.campaign!.gateOpenedAt!==undefined&&g.playTime-g.campaign!.gateOpenedAt<.9)return 'The pine gate is opening…';if(p.id==='glassworks-door'&&g.campaign!.stage<2)return 'Clear the three threats on the road first.';if(p.id==='crypt-stairs'&&!g.campaign!.recruited)return 'Find Lys before descending.';return p.label;}
+export function passageLocked(g:Game,p:Passage){
+  const c=g.campaign;
+  if(!c)return false;
+  if(p.id==='pine-gate')return c.stage<1||!c.villageGateOpen||c.gateOpenedAt!==undefined&&g.playTime-c.gateOpenedAt<.9;
+  if(p.id==='glassworks-door')return c.stage<2;
+  if(p.id==='crypt-stairs')return !c.recruited;
+  if(p.id==='estuary-arch')return c.stage<ESTUARY_STAGE.trail;
+  if(p.id==='lock-stairs')return c.stage<ESTUARY_STAGE.drained;
+  if(p.id==='bell-stairs')return c.stage<ESTUARY_STAGE.mooring;
+  if(p.id==='bell-shortcut')return !c.bellShortcut;
+  return false;
+}
+
+export function passageHint(g:Game,p:Passage){
+  if(!passageLocked(g,p))return p.label;
+  const stage=g.campaign!.stage;
+  const locked:Record<string,string>={
+    'pine-gate':stage<1?'Speak to Elder Elara before leaving Greyhaven.':g.campaign!.villageGateOpen?'The pine gate is opening…':'Open the pine gate',
+    'glassworks-door':'Clear the three threats on the road first.',
+    'crypt-stairs':'Find Lys before descending.',
+    'estuary-arch':'The coastal arch is locked.',
+    'lock-stairs':'Water covers the lower stairs.',
+    'bell-stairs':'The Keeper is still guarding the tower stairs.',
+    'bell-shortcut':'The tower door opens from the other side.',
+  };
+  return locked[p.id]??p.label;
+}
+
+export function estuaryFixture(g:Game,origin:Point=g.position){
+  const c=g.campaign;
+  if(c?.zone!=='estuary'||g.phase!=='explore')return;
+  if(Math.hypot(origin.x-g.position.x,origin.y-g.position.y)*CELL_METRES>INTERACTION_REACH)return;
+  const {x,y}=g.position;
+  if(x===SLUICE_WHEEL.x&&y===SLUICE_WHEEL.y&&c.stage<ESTUARY_STAGE.drained)return {id:'drain-lock',label:'Turn the sluice wheel'};
+  if(x===MOORING.x&&y===MOORING.y&&c.stage===ESTUARY_STAGE.mooring&&c.bellShortcut)return {id:'part-ways',label:'Speak to Lys at the mooring'};
+  if(x===TIDE_GATE.x&&y===TIDE_GATE.y&&c.stage===ESTUARY_STAGE.alone)return {id:'secure-tide',label:'Close the tide gate'};
+}
 
 export function revealRegion(g:Game){const c=g.campaign;if(!c)return;const w=regionOf(g),seen=new Set(c.worldSeen?.[c.zone]??[]);for(let y=Math.max(0,g.position.y-10);y<Math.min(w.map.length,g.position.y+11);y++)for(let x=Math.max(0,g.position.x-10);x<Math.min(w.map[0].length,g.position.x+11);x++){if(regionSight(c.zone,g.position,{x,y},g.gateOpen))seen.add(`${x},${y}`);else if(regionWall(c.zone,x,y))for(const[dx,dy]of [[1,0],[-1,0],[0,1],[0,-1]])if(regionSight(c.zone,g.position,{x:x+dx*.6,y:y+dy*.6},g.gateOpen))seen.add(`${x},${y}`);}c.worldSeen??={};c.worldSeen[c.zone]=[...seen];}
 
@@ -59,7 +96,12 @@ export function sharedOutdoors(a:Zone,b:Zone){return (a==='village'||a==='road')
 export function entrancePoint(p:Entrance):Point{const[dx,dy]=DIRECTIONS[p.direction];return{x:p.x+dx*.45,y:p.y+dy*.45};}
 export function entranceAhead(g:Game,origin:Point=g.position){const door=nearbyEntrance(g,origin);return door?.direction===g.direction?door:undefined;}
 export function nearbyEntrance(g:Game,origin:Point=g.position){if(!g.campaign||g.phase!=='explore')return;return regionOf(g).entrances.find(p=>{const target=entrancePoint(p),[dx,dy]=DIRECTIONS[p.direction];return (origin.x-target.x)*dx+(origin.y-target.y)*dy<=0&&withinReach(g,origin,target);});}
-export function roadThreat(g:Game){if(g.campaign?.zone!=='road'||g.phase!=='explore')return;return regionOf(g).encounters.filter(e=>(!g.cleared.has(e.id)||g.roaming.has(e.id))&&Math.hypot(e.x-g.position.x,e.y-g.position.y)<=2.15&&regionSight('road',g.position,e)).sort((a,b)=>Math.hypot(a.x-g.position.x,a.y-g.position.y)-Math.hypot(b.x-g.position.x,b.y-g.position.y))[0];}
+export function encounterPresent(g:Game,id:string){
+  const stage=g.campaign?.stage??0;
+  if(id==='tide-stray'&&stage<ESTUARY_STAGE.alone)return false;
+  return !g.cleared.has(id)||g.roaming.has(id);
+}
+export function roadThreat(g:Game){if(g.campaign?.zone!=='road'||g.phase!=='explore')return;return regionOf(g).encounters.filter(e=>encounterPresent(g,e.id)&&Math.hypot(e.x-g.position.x,e.y-g.position.y)<=2.15&&regionSight('road',g.position,e)).sort((a,b)=>Math.hypot(a.x-g.position.x,a.y-g.position.y)-Math.hypot(b.x-g.position.x,b.y-g.position.y))[0];}
 const trailSegments:{ax:number;ay:number;bx:number;by:number}[]=[];
 for(let y=0;y<road.length;y++)for(let x=0;x<road[0].length;x++)if(road[y][x]==='.')for(const[dx,dy]of [[1,0],[0,1]])if(road[y+dy]?.[x+dx]==='.')trailSegments.push({ax:x,ay:y,bx:x+dx,by:y+dy});
 /** Soft, uneven banks follow the connected path rather than the square tile perimeter. */

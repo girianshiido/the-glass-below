@@ -1,6 +1,7 @@
+import {ENCOUNTERS} from '../src/world.ts';
 import {test} from 'node:test';import assert from 'node:assert/strict';
-import {createGame,beginBattle,useSkill,tick,continueAfterBattle,canUse,updateRespawns} from '../src/engine.ts';
-import {setupCampaign,campaignAction,travel,ROAD_ENCOUNTERS,FURNACE,grantXp,roadMove} from '../src/campaign.ts';
+import {createGame,beginBattle,useSkill,tick,continueAfterBattle,canUse,updateRespawns,skillPower} from '../src/engine.ts';
+import {setupCampaign,campaignAction,travel,ROAD_ENCOUNTERS,FURNACE,grantXp,roadMove,refreshStats,CAMPAIGN_ENCOUNTERS} from '../src/campaign.ts';
 import {serialize,deserialize} from '../src/save.ts';
 import {musicScene} from '../src/audio-state.ts';
 const fresh=()=>setupCampaign(createGame());
@@ -24,3 +25,45 @@ test('The full first chapter can be completed through road, recruitment, crypt m
  go(CHEST);interact(g);go({x:17,y:8});interact(g);assert(g.gateOpen);go({x:17,y:12});assert(g.cleared.has('guardian'));assert.equal(g.campaign.stage,6);assert(travel(g,'village'));assert(campaignAction(g,'ending'));assert.equal(g.campaign.stage,7);assert(deserialize(serialize(g)));
 });
 test('A distant patrol in the crypts does not block the road from repopulating',()=>{const g=fresh();campaignAction(g,'accept');travel(g,'road');win(g,ROAD_ENCOUNTERS[0]);g.cleared.add('first');g.roaming.add('first');travel(g,'village');g.playTime=25;updateRespawns(g);assert(g.roaming.has('road-shards'));assert.equal(g.roaming.size,2);assert(deserialize(serialize(g)));});
+
+test('Neris can protect against a strike and set up one stronger Fracture',()=>{
+ const g=fresh();
+ Object.assign(g.campaign,{stage:14,recruited:true,bellShortcut:true});
+ refreshStats(g);
+ g.heroes[1].mp=g.heroes[1].maxMp;
+ beginBattle(g,ENCOUNTERS.find(e=>e.id==='guardian'));
+ assert(!canUse(g,'frost'));
+ assert(!canUse(g,'heal'));
+ assert(useSkill(g,'breakwater'));
+ const hp=g.heroes.map(h=>h.hp);
+ const e=g.battle.enemies[0];
+ e.windup=.02;
+ tick(g,.04);
+ assert.deepEqual(g.heroes.map(h=>h.hp),hp.map(n=>n-18));
+ assert.equal(g.battle.shield,0);
+ g.battle.globalCooldown=0;
+ assert(useSkill(g,'hook'));
+ const remaining=e.hp;
+ g.battle.globalCooldown=0;
+ assert(useSkill(g,'fracture'));
+ assert.equal(remaining-e.hp,Math.round(skillPower(g,'fracture')*1.5));
+ assert.equal(g.battle.exposed,false);
+});
+
+test('The Drowned Keeper can be defeated with Lys using the regular combat timers',()=>{
+ const g=fresh();
+ Object.assign(g.campaign,{stage:10,recruited:true,zone:'lockworks',level:5});
+ refreshStats(g);
+ g.heroes.forEach(h=>{h.hp=h.maxHp;h.mp=h.maxMp;});
+ const keeper=CAMPAIGN_ENCOUNTERS.find(e=>e.id==='bell-keeper');
+ assert(beginBattle(g,keeper));
+ for(let frame=0;frame<60*90&&g.phase==='combat';frame++){
+   const e=g.battle.enemies[0];
+   if(g.heroes.some(h=>h.hp<h.maxHp*.6))useSkill(g,'heal');
+   if(e.windup>0){useSkill(g,'frost');useSkill(g,'fracture');}
+   tick(g,1/60);
+ }
+ assert.equal(g.phase,'victory');
+ assert.equal(g.campaign.stage,11);
+ assert(g.heroes.some(h=>h.hp>0));
+});

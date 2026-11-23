@@ -1,9 +1,9 @@
-import {campaignAction,campaignObjective,xpNeeded} from './campaign.ts';
+import {campaignAction,campaignObjective,xpNeeded,ESTUARY_STAGE,activeHero,companion} from './campaign.ts';
 import type {Zone} from './campaign.ts';
-import {skillPower} from './engine.ts';
+import {skillPower,SKILLS,partySkills} from './engine.ts';
 import type {Game} from './engine.ts';
-export const ZONE_NAMES:Record<Zone,string>={village:'Greyhaven',road:'Old Pine Road',glassworks:'The Silent Glassworks',crypts:'The Glass Crypts'};
-const mark=(letter:string)=>{const frame:Record<string,number>={E:0,M:1,T:2,L:3};return `<span class="speaker-seal character-art ${letter==='K'?'kael':letter==='L'?'lys':'resident'}" style="--portrait:${frame[letter]??0}" aria-hidden="true"></span>`;};
+export const ZONE_NAMES:Record<Zone,string>={village:'Greyhaven',road:'Old Pine Road',glassworks:'The Silent Glassworks',crypts:'The Glass Crypts',estuary:'Saltreach',lockworks:'The Drowned Lock'};
+const mark=(letter:string)=>{const frame:Record<string,number>={E:0,M:1,T:2,L:3};return `<span class="speaker-seal character-art ${letter==='K'?'kael':letter==='L'?'lys':letter==='N'?'neris':'resident'}" style="--portrait:${frame[letter]??0}" aria-hidden="true"></span>`;};
 export class ChapterUI{
  constructor(private root:HTMLElement,private get:()=>Game,private changed:()=>void,private show:(title:string,html:string)=>void){
  root.addEventListener('click',e=>{const action=(e.target as Element).closest<HTMLElement>('[data-chapter]')?.dataset.chapter;if(action)this.action(action);});
@@ -11,16 +11,66 @@ export class ChapterUI{
  }
  render(){this.root.hidden=true;}
  action(action:string){const g=this.get(),c=g.campaign;if(!c)return;
- if(action==='walk'){this.close();g.message=c.zone==='glassworks'?'Walk to the marked stairs in the north-east corner.':'Explore Greyhaven on foot.';this.changed();return;}
+ if(action==='walk'){this.close();g.message='';this.changed();return;}
  if(action==='furnace'){this.close();g.message='Approach the Watcher in the centre of the furnace hall.';this.changed();return;}
  if(action==='region'){this.region();return;}
  if(action==='journal'){this.journal();return;}
  if(action==='party'){this.party();return;}
  if(action==='elara'){
+ if(c.stage>=ESTUARY_STAGE.rumor){
+   const rumor=c.stage===ESTUARY_STAGE.rumor;
+   const line=rumor
+     ? '“Two short notes, then one long. That was how my brother called me home.”'
+     : '“The coast road branches north from the pines. Neris keeps the boathouse at Saltreach.”';
+   const invitation=rumor
+     ? this.dialogue('L',line)+this.dialogue('E','“Then ask Neris. Take the stone arch on the north side of the first forest clearing. The path beyond it leads to Saltreach.”')
+     : this.dialogue('E',line);
+   this.show('Elder Elara',invitation+(rumor?'<button class="primary" data-chapter="follow-bell">Follow the bell</button>':''));
+   return;
+ }
+
  const lines=[`“My husband forgot our daughter's name yesterday. This morning, I forgot his face. The old road is full of things made of glass. Clear it, and find what happened to our courier.”`, `“Three creatures haunt the Old Pine Road. Bring light back to the path, Kael. Then we can reach the glassworks.”`, `“The courier's satchel was empty? Then the memories are being carried somewhere else. Take this payment. Lys went to the glassworks before dawn. Please find her.”`, `“Lys knew the old furnaces better than anyone. Look for her at the abandoned glassworks.”`, `“A woman is trapped beyond the furnace? Bring her home.”`, `“The kiln stairs lead below the village. If the glass remembers our lives, perhaps you can bring them back.”`, `“This prism… I remember her laugh. Not her name yet, but her laugh. You have given us a beginning. There are other prisms, Kael. And other villages.”`, `“Mara remembers the song she used to sing. Tovin remembers his brother. The road remains dangerous, but Greyhaven is awake again.”`];
  this.show('Elder Elara',this.dialogue('E',lines[c.stage])+`<div class="dialog-actions">${c.stage===0?'<button class="primary" data-chapter="accept">I will clear the road</button>':c.stage===2?'<button class="primary" data-chapter="report">Report the cleared road · Claim reward</button>':c.stage===6?'<button class="primary" data-chapter="ending">Return the memory prism</button>':'<button class="secondary" data-chapter="region">Open region map</button>'}</div>`);return;
  }
- if(['accept','report','recruit','ending'].includes(action)){if(campaignAction(g,action)){this.changed();if(action==='recruit')this.show('Lys joins the party',this.dialogue('L','“They are not stealing memories. They are storing them. The Watcher was guarding a door beneath the kiln. I know the way.”')+'<p class="reward-line">Lys joins at your level. Frost Shard and Mending Seal are now available.</p><button class="primary" data-chapter="walk">Find the kiln stairs</button>');else if(action==='ending')this.show('Chapter I · The Borrowed Light',`<div class="chapter-ending">◇</div><h3>Greyhaven remembers</h3><p class="dialog-intro">The village lamps burn steadily for the first time in weeks. Beneath the glassworks, the Warden is silent. Somewhere beyond the pines, another bell begins to ring.</p><p class="reward-line">Chapter complete · +100 shards · +100 XP</p><button class="primary" data-chapter="walk">Continue exploring</button>`);else this.action('elara');}return;}
+ if(['accept','report','recruit','ending'].includes(action)){if(campaignAction(g,action)){this.changed();if(action==='recruit')this.show('Lys joins the party',this.dialogue('L','“They are not stealing memories. They are storing them. The Watcher was guarding a door beneath the kiln. I know the way.”')+'<p class="reward-line">Lys joins at your level. Frost Shard and Mending Seal are now available.</p><button class="primary" data-chapter="walk">Find the kiln stairs</button>');else if(action==='ending')this.show('Chapter I · The Borrowed Light',`<div class="chapter-ending">◇</div><h3>Greyhaven remembers</h3><p class="dialog-intro">The village lamps burn steadily for the first time in weeks. Beneath the glassworks, the Warden is silent. Somewhere beyond the pines, another bell begins to ring.</p><p class="reward-line">Chapter complete · +100 shards · +100 XP</p><button class="primary" data-chapter="elara">Ask Elara about the bell</button>`);else this.action('elara');}return;}
+ if(action==='follow-bell'&&campaignAction(g,action)){
+   this.changed();
+   this.show('Chapter II · The Drowned Bell',this.dialogue('L','“If it really was him, he knew I would hear it. Come on. We can make the coast before the light goes.”')+'<button class="primary" data-chapter="walk">Leave for Saltreach</button>');
+   return;
+ }
+ if(action==='neris'){this.neris();return;}
+ if(action==='meet-neris'&&campaignAction(g,action)){this.changed();this.neris();return;}
+ if(action==='drain-lock'){
+   if(campaignAction(g,action)){
+     g.message='The water recedes. The stairs beneath the quay are clear.';
+     this.changed();
+   }else this.show('The sluice wheel','<p class="dialog-intro">The locking pin is still in place. The ferrymaster may know how to release it.</p>');
+   return;
+ }
+ if(action==='part-ways'){
+   this.show('The mooring',this.dialogue('L','“The cargo tally says he is alive. They took him downstream at dawn. If I launch now, I can catch the barge.”')+this.dialogue('K','“Then go. The tide gate is still open. I will keep the water out of the houses.”')+'<button class="primary" data-chapter="lys-departs">See Lys off</button>');
+   return;
+ }
+ if(action==='lys-departs'&&campaignAction(g,'part-ways')){
+   this.changed();
+   this.show('Lys sets out',this.dialogue('L','“Tell Neris I owe her a boat. And Kael… listen for the bell.”')+'<p class="dialog-intro">Her boat slips into the mist. Water is already rising at the far end of the lower quay.</p><button class="primary" data-chapter="walk">Follow the quay to the tide gate</button>');
+   return;
+ }
+ if(action==='secure-tide'){
+   if(campaignAction(g,action)){
+     g.message='The tide gate is shut. Return to Neris at the boathouse.';
+     this.changed();
+   }else{
+     g.message='A creature is still in the spillway.';
+     this.changed();
+   }
+   return;
+ }
+ if(action==='sail-with-neris'&&campaignAction(g,action)){
+   this.changed();
+   this.show('Chapter III · The River of Names',this.dialogue('N','“There is another landing downriver. I know every snag and sandbank between here and there. We will find the barge.”')+'<p class="reward-line">Neris joins the party. Breakwater blunts an enemy strike. Hook Feint sets up a stronger Fracture.</p><button class="primary" data-chapter="walk">Return to Saltreach</button>');
+   return;
+ }
  if(action==='lys'){this.show('Lys',this.dialogue('L',c.stage<4?'“Do not come closer. The Watcher wakes when it hears a name. Break its lantern, and I can reach you.”':c.stage===4?'“You broke its hold. I came here for my brother. The furnace speaks with his voice. Let me come with you.”':'“The prism below is only one fragment. Someone built a whole network beneath these villages.”')+(c.stage===4?'<button class="primary" data-chapter="recruit">Ask Lys to join you</button>':c.recruited?'<button class="primary" data-chapter="walk">Find the kiln stairs</button>':'<button class="primary" data-chapter="furnace">Confront the Watcher</button>'));return;}
  if(action==='inn'){this.interior('inn','The Lantern & Thorn','<p class="service-quote">“A warm room. A meal. A few things the glass has not taken from us. Rest while you can.”</p>'+`<p class="reward-line">Restore the party's HP and MP · 5 shards</p><button class="primary" data-chapter="rest" ${g.gold<5?'disabled':''}>Rest · 5 shards</button>`);return;}
  if(action==='shop'){this.shop();return;}
@@ -28,11 +78,61 @@ export class ChapterUI{
  if(action==='rest'){if(campaignAction(g,action)){this.changed();this.interior('inn','A quiet night','<p class="service-quote">“You look more like yourself. That matters, these days.”</p>'+'<p class="reward-line">HP and MP fully restored.</p>');}return;}
  if(action==='potion'){if(campaignAction(g,action)){this.changed();this.party();}return;}
  }
- private interior(kind:'inn'|'shop',title:string,html:string){this.show(title,`<section class="service-scene service-${kind}" aria-label="${kind==='inn'?'Inside Mara’s inn':'Inside Tovin’s shop'}"><div class="service-ui">${html}<button class="secondary service-leave" data-chapter="walk">Return outside</button></div></section>`);document.getElementById('dialog')!.classList.add('service-dialog');}
+ private interior(kind:'inn'|'shop'|'neris',title:string,html:string){this.show(title,`<section class="service-scene service-${kind}" aria-label="${kind==='inn'?'Inside Mara’s inn':kind==='shop'?'Inside Tovin’s shop':'Inside Neris’s boathouse'}"><div class="service-ui">${html}<button class="secondary service-leave" data-chapter="walk">Return outside</button></div></section>`);document.getElementById('dialog')!.classList.add('service-dialog');}
+ private neris(){
+   const stage=this.get().campaign!.stage;
+   const lines:Record<number,string>={
+     [ESTUARY_STAGE.trail]:'“The bell sounds from under the quay. The old lock flooded years ago. I can show you how to free the wheel on the north pier.”',
+     [ESTUARY_STAGE.sluice]:'“Follow the north pier to the wheel. Pull the pin I showed you and turn it. The stairhead is on the quay next to the pier.”',
+     [ESTUARY_STAGE.drained]:'“The stairhead is clear now. Mind the salt on the steps. The bell tower door is bolted from below.”',
+     [ESTUARY_STAGE.mooring]:'“Someone drew a cargo tally this morning. If Lys found a name on it, take her down to the mooring.”',
+     [ESTUARY_STAGE.alone]:'“The lower quay runs east behind the cottages. Close the tide gate at the end or we will have water in the houses.”',
+     [ESTUARY_STAGE.ferrymaster]:'“You kept the water out. I saw which channel that barge took. If you are still going after it, I am coming with you.”',
+     [ESTUARY_STAGE.joined]:'“Now we know which channel the barge took. Keep that tally safe.”',
+   };
+   const button=stage===ESTUARY_STAGE.trail?'<button class="primary" data-chapter="meet-neris">Ask about the sluice</button>'
+     :stage===ESTUARY_STAGE.ferrymaster?'<button class="primary" data-chapter="sail-with-neris">Ask Neris to join you</button>':'';
+   this.interior('neris','Neris’s boathouse',`<p class="service-quote">${lines[stage]??'“The tide turns before dusk.”'}</p>${button}`);
+ }
  private close(){(document.getElementById('dialog')as HTMLDialogElement).close();}
  private dialogue(letter:string,line:string){return `<div class="dialogue-speaker">${mark(letter)}<p>${line}</p></div>`;}
- region(){const g=this.get(),c=g.campaign!;this.show('The Greyhaven Coast',`<div class="region-map"><svg viewBox="0 0 500 300" aria-hidden="true"><path class="coast" d="M0 210Q110 110 170 195T310 230Q390 180 500 220V300H0Z"/><path class="region-road" d="M100 190Q200 70 280 95T410 175"/><path class="region-road underground" d="M410 175L380 265"/><path class="ridge" d="m230 30 25-25 25 25 20-15 40 40m-10 0 30-35 40 55"/></svg>${(['village','road','glassworks','crypts']as Zone[]).map(z=>`<div class="region-node ${z==='glassworks'?'works':z} ${c.zone===z?'current':''}"><b>${ZONE_NAMES[z]}</b><small>${c.zone===z?'You are here':z==='village'?'Rest & supplies':z==='road'?'Eastern village gate':z==='glassworks'?'Beyond the pine road':'Stairs inside the glassworks'}</small></div>`).join('')}</div><p class="quest-current">${campaignObjective(g)}</p><p class="fine">Follow the roads and marked doorways on foot. The local map shows discovered passages and residents.</p>`);}
- journal(){const g=this.get(),c=g.campaign!;const quests=[['The Borrowed Light','Speak to Elder Elara',c.stage>0],['A Road of Shards',`Clear the road · ${c.roadCleared.length} / 3 threats defeated`,c.stage>2],['The Voice in the Furnace','Find and recruit Lys at the glassworks',c.recruited],['What the Glass Remembers','Defeat the Warden and bring the prism to Elara',c.stage===7]];this.show('Journal',`<p class="quest-current">${campaignObjective(g)}</p><div class="quest-list">${quests.map(([title,desc,done])=>`<article class="${done?'done':''}"><span>${done?'✓':'◇'}</span><div><h3>${title}</h3><p>${desc}</p></div></article>`).join('')}</div><p class="fine">Returning patrols do not undo completed quests. Cleared sectors can repopulate after 20 seconds away and out of sight.</p>`);}
- party(){const g=this.get(),c=g.campaign!;this.show('Party & equipment',`<div class="character-sheet">${g.heroes.filter((_,i)=>i===0||c.recruited).map((h,i)=>`<article>${mark(i===0?'K':'L')}<h3>${h.name} <small>Level ${c.level}</small></h3><p>${i===0?'Vanguard':'Frostweaver'} · ${h.attack} attack</p><p>${Math.ceil(h.hp)} / ${h.maxHp} HP · ${Math.floor(h.mp)} / ${h.maxMp} MP</p></article>`).join('')}</div><div class="xp-track"><i style="width:${Math.min(100,c.xp/xpNeeded(c.level)*100)}%"></i></div><p class="fine">${c.xp} / ${xpNeeded(c.level)} XP to level ${c.level+1}</p><div class="equipment-list"><p><span>Fracture</span><b>${skillPower(g,'fracture')} damage · 5 MP</b></p>${c.recruited?`<p><span>Frost Shard</span><b>${skillPower(g,'frost')} damage · 7 MP</b></p><p><span>Mending Seal</span><b>${skillPower(g,'heal')} HP · 9 MP</b></p>`:''}</div><div class="equipment-list"><p><span>Weapon</span><b>${c.weapon==='iron'?'Iron sword':'Tempered blade · +5 attack'}</b></p><p><span>Protection</span><b>${c.armor==='travel'?'Travel coat':'Warden leather · +20 HP · −3 incoming damage'}</b></p><p><span>Accessory</span><b>${c.charm?'Frostglass charm · +8 spell damage':'None'}</b></p></div><button class="primary" data-chapter="potion" ${c.potions===0?'disabled':''}>Use healing tonic · ${c.potions} remaining</button><p class="fine">Tonics restore 80 HP to the most wounded party member.</p><p class="reward-line">Key items: Sealed letter${c.stage>=2?' · Empty courier’s satchel':''}${c.stage>=6?' · Memory prism':''}</p>`);}
+ region(){
+   const g=this.get(),c=g.campaign!,showCoast=c.stage>=ESTUARY_STAGE.trail;
+   const nodes:[Zone,string][]=[['village','Rest & supplies'],['road','Eastern village gate'],['glassworks','Beyond the pine road'],['crypts','Below the glassworks']];
+   if(showCoast)nodes.push(['estuary','Coastal arch off the pine road'],['lockworks','Beneath the quay']);
+   this.show('The Greyhaven Coast',`<div class="region-map ${showCoast?'expanded':''}">
+     <svg viewBox="0 0 500 300" aria-hidden="true">
+       <path class="coast" d="M0 210Q110 110 180 178T310 230T500 220V300H0Z"/>
+       <path class="region-road" d="M100 190Q200 70 280 95T410 175"/>
+       <path class="region-road underground" d="M410 175L380 265"/>
+       ${showCoast?'<path class="region-road" d="M220 63Q290 72 325 36"/><path class="region-road underground" d="M357 50Q348 24 400 38"/>':''}
+     </svg>
+     ${nodes.map(([z,detail])=>`<div class="region-node ${z==='glassworks'?'works':z} ${c.zone===z?'current':''}"><b>${ZONE_NAMES[z]}</b><small>${c.zone===z?'You are here':detail}</small></div>`).join('')}
+     </div><p class="quest-current">${campaignObjective(g)}</p>`);
+ }
+ journal(){
+   const g=this.get(),c=g.campaign!;
+   const quests=[
+     ['The Borrowed Light','Speak to Elder Elara',c.stage>0],
+     ['A Road of Shards',`Clear the road · ${c.roadCleared.length} / 3 threats defeated`,c.stage>2],
+     ['The Voice in the Furnace','Find and recruit Lys at the glassworks',c.recruited],
+     ['What the Glass Remembers','Defeat the Warden and bring the prism to Elara',c.stage>=ESTUARY_STAGE.rumor],
+   ];
+   if(c.stage>=ESTUARY_STAGE.trail)quests.push(
+     ['The Drowned Bell','Talk to Neris, drain the lock and trace the bell',c.stage>=ESTUARY_STAGE.mooring],
+     ['A Boat in the Mist','Speak to Lys at the mooring after opening the tower door',c.stage>=ESTUARY_STAGE.alone],
+   );
+   if(c.stage>=ESTUARY_STAGE.alone)quests.push(['The Tide Gate','Close the tide gate and return to Neris',c.stage>=ESTUARY_STAGE.joined]);
+   this.show('Journal',`<p class="quest-current">${campaignObjective(g)}</p><div class="quest-list">${quests.map(([title,desc,done])=>`<article class="${done?'done':''}"><span>${done?'✓':'◇'}</span><div><h3>${title}</h3><p>${desc}</p></div></article>`).join('')}</div>`);
+ }
+ party(){
+   const g=this.get(),c=g.campaign!,neris=companion(g)==='neris';
+   const heroes=g.heroes.map((h,i)=>activeHero(g,i)?`<article>${mark(i===0?'K':neris?'N':'L')}<h3>${h.name} <small>Level ${c.level}</small></h3><p>${i===0?'Vanguard':neris?'Ferrymaster':'Frostweaver'} · ${h.attack} attack</p><p>${Math.ceil(h.hp)} / ${h.maxHp} HP · ${Math.floor(h.mp)} / ${h.maxMp} MP</p></article>`:'').join('');
+   const skills=partySkills(g).map(id=>{
+     const power=id==='breakwater'?'50% less damage':id==='heal'?`${skillPower(g,id)} HP`:`${skillPower(g,id)} damage`;
+     return `<p><span>${SKILLS[id].name}</span><b>${power} · ${SKILLS[id].cost} MP</b></p>`;
+   }).join('');
+   this.show('Party & equipment',`<div class="character-sheet">${heroes}</div><div class="xp-track"><i style="width:${Math.min(100,c.xp/xpNeeded(c.level)*100)}%"></i></div><p class="fine">${c.xp} / ${xpNeeded(c.level)} XP to level ${c.level+1}</p><div class="equipment-list">${skills}</div><div class="equipment-list"><p><span>Weapon</span><b>${c.weapon==='iron'?'Iron sword':'Tempered blade · +5 attack'}</b></p><p><span>Protection</span><b>${c.armor==='travel'?'Travel coat':'Warden leather · +20 HP · −3 incoming damage'}</b></p><p><span>Accessory</span><b>${c.charm?'Frostglass charm · +8 Frost Shard damage':'None'}</b></p></div><button class="primary" data-chapter="potion" ${c.potions===0?'disabled':''}>Use healing tonic · ${c.potions} remaining</button><p class="fine">Tonics restore 80 HP to the most wounded party member.</p><p class="reward-line">Key items: Sealed letter${c.stage>=2?' · Empty courier’s satchel':''}${c.stage===6?' · Memory prism':''}${c.stage>=ESTUARY_STAGE.mooring?' · Cargo tally':''}</p>`);
+ }
  private shop(message=''){const g=this.get(),c=g.campaign!;const goods=[['buy-potion','Healing tonic','Restores 80 HP',12,c.potions>=9],['buy-weapon','Tempered blade','+5 attack',45,c.weapon==='tempered'],['buy-armor','Warden leather','+20 HP · −3 damage received',40,c.armor==='warden'],['buy-charm','Frostglass charm','+8 Frost Shard damage',30,c.charm]]as const;this.interior('shop',"Tovin's provisions",'<p class="service-quote">“Iron for what has teeth. Glass for what has none. Both are useful on that road.”</p>'+`<p class="reward-line">${g.gold} shards · ${message}</p><div class="shop-list">${goods.map(([action,name,desc,price,owned])=>`<button data-chapter="${action}" ${owned||g.gold<price?'disabled':''}><span><b>${name}</b><small>${desc}</small></span><strong>${owned?'Owned':price+' ◇'}</strong></button>`).join('')}</div>`);}
 }

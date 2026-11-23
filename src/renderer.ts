@@ -1,3 +1,4 @@
+import {ESTUARY_STAGE,BELL_STEPS,LOCK_STAIRS,ROAD_TO_ESTUARY,SLUICE_WHEEL,TIDE_GATE} from './estuary-world.ts';
 import {CRYPT_TORCHES,TORCH_HEIGHT} from './scene-lights.ts';
 import {regionGeometry,COLORS,box as regionBox,quad as regionQuad} from './region-geometry.ts';
 import type {Material} from './region-geometry.ts';
@@ -25,7 +26,9 @@ if(uMode<.5||uMode>4.5){vec3 n=normalize(vNormal+vec3(sin(vWorld.z*41.)*.045,0.,
  float lantern=distance(vWorld,uEye+vec3(0.,-.4,0.));light+=vec3(.55,.64,.61)*2.3*(1.-uOutside)*uHeadlamp/(1.+lantern*lantern*.55);if(uOutside>.5)light=min(light,vec3(1.2));
  float base=clamp(vWorld.y/.24,0.,1.);if(abs(n.y)<.5)light*=.62+.38*base;
 }else if(uMode<1.5){light=vec3(.82,.86,.83);}else{light=vec3(1.);}
-vec3 color=tex.rgb*light*uTint+sheen;if(uMode>2.5&&uMode<3.5){float ripple=sin(length(vWorld.xz-vec2(26.,20.8))*27.-uTime*4.)*.5+.5;float glint=pow(max(0.,sin(vWorld.x*31.+vWorld.z*24.-uTime*2.)),20.);color+=vec3(.1,.17,.19)*ripple+vec3(.45,.56,.6)*glint;}if(uMode>3.5&&uMode<4.5){float fresnel=pow(1.-abs(dot(normalize(vNormal),normalize(uEye-vWorld))),3.);color+=vec3(.22,.3,.35)*fresnel;}float fog=1.-exp(-d*d*uFogDensity);float drift=.8+.2*sin(vWorld.x*.16+uTime*.08)*sin(vWorld.z*.13-uTime*.05);fog+=uOutside*.15*(1.-exp(-d*.035))*exp(-max(0.,vWorld.y)*1.35)*drift;color=mix(color,uFogColor,min(.99,fog));gl_FragColor=vec4(color,tex.a*uAlpha);}`;
+vec3 color=tex.rgb*light*uTint+sheen;if(uMode>2.5&&uMode<3.5){float ripple=sin(length(vWorld.xz-vec2(26.,20.8))*27.-uTime*4.)*.5+.5;float glint=pow(max(0.,sin(vWorld.x*31.+vWorld.z*24.-uTime*2.)),20.);
+if(uMode>3.1){float wave=vWorld.z*2.6+vWorld.x*.72-uTime*1.14;ripple=.52+.28*sin(wave)+.13*sin(vWorld.z*5.8-vWorld.x*1.33+uTime*.76);glint=pow(max(0.,sin(wave+sin(vWorld.x*.83+uTime*.19))),16.)*.25;}
+color+=vec3(.1,.17,.19)*ripple+vec3(.45,.56,.6)*glint;}if(uMode>3.5&&uMode<4.5){float fresnel=pow(1.-abs(dot(normalize(vNormal),normalize(uEye-vWorld))),3.);color+=vec3(.22,.3,.35)*fresnel;}float fog=1.-exp(-d*d*uFogDensity);float drift=.8+.2*sin(vWorld.x*.16+uTime*.08)*sin(vWorld.z*.13-uTime*.05);fog+=uOutside*.15*(1.-exp(-d*.035))*exp(-max(0.,vWorld.y)*1.35)*drift;color=mix(color,uFogColor,min(.99,fog));gl_FragColor=vec4(color,tex.a*uAlpha);}`;
 function projection(aspect:number,shiftY=0){const f=1/Math.tan(VERTICAL_FOV/2),n=.06,far=220;return new Float32Array([f/aspect,0,0,0,0,f,0,0,0,shiftY,(far+n)/(n-far),-1,0,0,2*far*n/(n-far),0]);}
 function view(eye:Vec,yaw:number){const c=Math.cos(yaw),s=Math.sin(yaw);return new Float32Array([-s,0,-c,0,0,1,0,0,c,0,-s,0,s*eye[0]-c*eye[2],-eye[1],c*eye[0]+s*eye[2],1]);}
 function quad(out:number[],a:Vec,b:Vec,c:Vec,d:Vec,n:Vec,uv=[0,0,1,1]){
@@ -194,9 +197,9 @@ export class DungeonRenderer {
   }
   private renderRegion(g:Game,camera:Camera,time:number){
     const gl=this.gl,w=Math.round(this.canvas.clientWidth*Math.min(devicePixelRatio||1,1.6)),h=Math.round(this.canvas.clientHeight*Math.min(devicePixelRatio||1,1.6));if(this.canvas.width!==w||this.canvas.height!==h){this.canvas.width=w;this.canvas.height=h;}if(!w||!h)return;
-    const region=regionOf(g),offset=regionOffset(region.zone),battle=g.battle,clock=g.phase==='combat'?battle!.time:time,eye:Vec=[(camera.x+offset.x)*CELL,CAMERA_HEIGHT,(camera.y+offset.y)*CELL],outdoor=region.outdoor;
-    const fog:Vec=outdoor?[.38,.49,.54]:region.zone==='glassworks'?[.08,.14,.17]:[.025,.065,.08];gl.clearColor(...fog,1);gl.viewport(0,0,w,h);gl.depthMask(true);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.useProgram(this.program);
-    const lights:Vec[]=region.zone==='crypts'?CRYPT_TORCHES.map(p=>[p.x*CELL,TORCH_HEIGHT,p.y*CELL]):region.zone==='glassworks'?[[4.5*CELL,1.5,7.6*CELL],[17.5*CELL,1.5,7.6*CELL],[4.5*CELL,1.5,11.4*CELL],[18*CELL,1.5,11.4*CELL]]:[];
+    const region=regionOf(g),offset=regionOffset(region.zone),battle=g.battle,clock=g.phase==='combat'?battle!.time:time,eye:Vec=[(camera.x+offset.x)*CELL,CAMERA_HEIGHT,(camera.y+offset.y)*CELL],outdoor=region.outdoor,greyhavenExterior=region.zone==='village'||region.zone==='road';
+    const fog:Vec=region.zone==='estuary'?[.44,.55,.57]:outdoor?[.38,.49,.54]:region.zone==='glassworks'?[.08,.14,.17]:[.025,.065,.08];gl.clearColor(...fog,1);gl.viewport(0,0,w,h);gl.depthMask(true);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.useProgram(this.program);
+    const lights:Vec[]=region.zone==='crypts'?CRYPT_TORCHES.map(p=>[p.x*CELL,TORCH_HEIGHT,p.y*CELL]):region.zone==='glassworks'?[[4.5*CELL,1.5,7.6*CELL],[17.5*CELL,1.5,7.6*CELL],[4.5*CELL,1.5,11.4*CELL],[18*CELL,1.5,11.4*CELL]]:region.zone==='lockworks'?[[2.4*CELL,1.5,9*CELL],[8.4*CELL,1.5,6*CELL],[12.4*CELL,1.5,5*CELL],[12.4*CELL,1.5,3*CELL]]:[];
     const encounter=battle?encounterDefinition(battle.encounter):undefined;
     const advance=battle?Math.max(0,...battle.enemies.map(e=>{const age=battle.time-e.strikeAt;return age>=0&&age<.3?Math.sin(age/.3*Math.PI)*.22:0;})):0;
     const close=encounter&&battle?battlePosition(g.position,encounter,battle.time):encounter;
@@ -205,11 +208,16 @@ export class DungeonRenderer {
     gl.uniformMatrix4fv(this.uniforms.uProjection,false,projection(w/h,framing?.shiftY??0));gl.uniformMatrix4fv(this.uniforms.uView,false,view(eye,camera.yaw));gl.uniform3fv(this.uniforms.uEye,eye);gl.uniform3fv(this.uniforms['uTorches[0]'],lights.length?lights.flat():[0,0,0]);gl.uniform1f(this.uniforms.uTorchCount,lights.length);gl.uniform3fv(this.uniforms.uAmbient,outdoor?[.8,.86,.9]:region.zone==='crypts'?[.13,.18,.2]:[.3,.36,.38]);gl.uniform1f(this.uniforms.uHeadlamp,0);gl.uniform1f(this.uniforms.uTime,clock);gl.uniform1f(this.uniforms.uOutside,outdoor?1:0);gl.uniform3fv(this.uniforms.uFogColor,fog);gl.uniform1f(this.uniforms.uFogDensity,outdoor?.000065:.00024);
     if(outdoor){const skybox:number[]=[],cx=20*CELL,cz=8*CELL,r=145;regionQuad(skybox,[cx-r,-30,cz-r],[cx+r,-30,cz-r],[cx+r,100,cz-r],[cx-r,100,cz-r],[0,0,1]);regionQuad(skybox,[cx+r,-30,cz+r],[cx-r,-30,cz+r],[cx-r,100,cz+r],[cx+r,100,cz+r],[0,0,-1]);regionQuad(skybox,[cx-r,-30,cz+r],[cx-r,-30,cz-r],[cx-r,100,cz-r],[cx-r,100,cz+r],[1,0,0]);regionQuad(skybox,[cx+r,-30,cz-r],[cx+r,-30,cz+r],[cx+r,100,cz+r],[cx+r,100,cz-r],[-1,0,0]);regionQuad(skybox,[cx-r,100,cz-r],[cx+r,100,cz-r],[cx+r,100,cz+r],[cx-r,100,cz+r],[0,-1,0],[0,1,1,1]);gl.depthMask(false);gl.uniform1f(this.uniforms.uFogDensity,0);this.transient(skybox,this.sky,[1,1,1],2);gl.uniform1f(this.uniforms.uFogDensity,.000065);gl.depthMask(true);}
     if(outdoor){gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.trailMask);gl.uniform1i(this.uniforms.uTrailMask,1);gl.activeTexture(gl.TEXTURE2);gl.bindTexture(gl.TEXTURE_2D,this.materials.get('grass')!);gl.uniform1i(this.uniforms.uGrass,2);gl.activeTexture(gl.TEXTURE0);}
-    for(const {material,mesh}of (outdoor?this.outdoorMeshes:this.regions.get(region.zone)!)){const tex=this.materials.get(material)??(material==='stone'?this.wallTexture:material==='floor'?this.floorTexture:this.white);if(material==='shadow'||material==='water')gl.depthMask(false);this.draw(mesh,tex,COLORS[material],material==='path'?5:material==='water'?3:['glass','coolglass'].includes(material)?4:['ember','shadow'].includes(material)?2:0,material==='shadow'?.25:material==='water'?.78:1);gl.depthMask(true);}
+    for(const {material,mesh}of (greyhavenExterior?this.outdoorMeshes:this.regions.get(region.zone)!)){const tex=this.materials.get(material)??(material==='stone'?this.wallTexture:material==='floor'?this.floorTexture:this.white);if(material==='shadow'||material==='water')gl.depthMask(false);this.draw(mesh,tex,COLORS[material],material==='path'?5:material==='water'?(region.zone==='estuary'?3.25:3):['glass','coolglass'].includes(material)?4:['ember','shadow'].includes(material)?2:0,material==='shadow'?.25:material==='water'?.78:1);gl.depthMask(true);}
     const props:number[]=[];
-    if(outdoor){
+    if(greyhavenExterior){
       const amount=g.campaign!.villageGateOpen?Math.min(1,Math.max(0,(g.playTime-(g.campaign!.gateOpenedAt??-2))/.9)):0;
       for(const side of [-1,1]){const hinge=8*CELL+side*CELL/2,angle=amount*Math.PI*.48;for(let bar=0;bar<=6;bar++){const d=bar*CELL/12;regionBox(props,20*CELL-Math.sin(angle)*d,0,hinge-side*Math.cos(angle)*d,.07,2.7,.07);}for(const y of [.5,1.5,2.6]){const d=CELL/4,x=20*CELL-Math.sin(angle)*d,z=hinge-side*Math.cos(angle)*d;const a:Vec=[x+Math.sin(angle)*CELL/4,y,z+side*Math.cos(angle)*CELL/4],b:Vec=[x-Math.sin(angle)*CELL/4,y,z-side*Math.cos(angle)*CELL/4];regionQuad(props,a,b,[b[0],y+.08,b[2]],[a[0],y+.08,a[2]],[1,0,0]);}}
+      if(g.campaign!.stage<ESTUARY_STAGE.trail){
+        const offset=regionOffset('road'),x=(ROAD_TO_ESTUARY.x+offset.x)*CELL,z=(ROAD_TO_ESTUARY.y+offset.y)*CELL;
+        for(let bar=-4;bar<=4;bar++)regionBox(props,x+bar*.25,0,z,.07,2.98,.08);
+        regionBox(props,x,1.05,z,2.32,.09,.09);
+      }
       this.transient(props,this.white,[.24,.23,.17]);
     }
     if(region.zone==='crypts'){
@@ -222,14 +230,60 @@ export class DungeonRenderer {
       for(const[x,y,z]of lights){const pulse=1+.06*Math.sin(clock*8+x);this.transient(this.billboard(x,z,.85,1.1,camera.yaw,[0,0,1,1],y-.35),this.glow,[1,.45,.16],2,.32);this.transient(this.billboard(x+.02*Math.sin(clock*11),z,.22*pulse,.59*pulse,camera.yaw,[0,0,1,1],y-.04),this.flame,[1,1,1],2);}
       gl.depthMask(true);
     }
+    if(region.zone==='estuary'){
+      this.drawEstuaryControls(g);
+      const c=g.campaign!;
+      if(this.residents&&c.stage===ESTUARY_STAGE.mooring&&c.bellShortcut)
+        this.transient(this.billboard(22.4*CELL,11.4*CELL,.82,1.9,camera.yaw,[.75,0,1,1],-.13),this.residents,[1,1,1],1);
+    }
     // Opaque world geometry writes depth first; alpha cutout characters then occlude correctly.
     const sprites:{x:number;y:number;kind?:keyof typeof CREATURES;enemy?:Enemy;frame?:number;scale:number}[]=[];
-    for(const visible of outdoor?[REGION_WORLDS.village,REGION_WORLDS.road]:[region]){const origin=regionOffset(visible.zone);for(const e of visible.encounters){const active=battle?.encounter===e.id;if(!encounterActive(g,e.id)||g.phase==='victory'&&active)continue;const place=active&&battle?battlePosition(g.position,e,battle.time):e;sprites.push({...e,x:place.x+origin.x,y:place.y+origin.y,enemy:active?visibleEnemy(battle!):undefined,scale:active?framing?.scale??1:1});}for(const n of visible.residents)if(!(n.id==='lys'&&g.campaign!.recruited))sprites.push({...n,x:n.x+origin.x,y:n.y+origin.y,scale:1});}
+    for(const visible of greyhavenExterior?[REGION_WORLDS.village,REGION_WORLDS.road]:[region]){const origin=regionOffset(visible.zone);for(const e of visible.encounters){const active=battle?.encounter===e.id;if(!encounterActive(g,e.id)||g.phase==='victory'&&active)continue;const place=active&&battle?battlePosition(g.position,e,battle.time):e;sprites.push({...e,x:place.x+origin.x,y:place.y+origin.y,enemy:active?visibleEnemy(battle!):undefined,scale:active?framing?.scale??1:1});}for(const n of visible.residents)if(!(n.id==='lys'&&g.campaign!.recruited))sprites.push({...n,x:n.x+origin.x,y:n.y+origin.y,scale:1});}
     sprites.sort((a,b)=>Math.hypot(b.x-camera.x-offset.x,b.y-camera.y-offset.y)-Math.hypot(a.x-camera.x-offset.x,a.y-camera.y-offset.y));
     for(const s of sprites){if(s.frame!==undefined){if(this.residents)this.transient(this.billboard(s.x*CELL,s.y*CELL,.82,1.9,camera.yaw,[s.frame/4,0,(s.frame+1)/4,1]),this.residents,[1,1,1],1);continue;}if(!this.atlas||!s.kind)continue;
       const e=s.enemy;let pose=Math.floor(clock*1.7)%2;if(e){if(e.hp<=0||battle!.time-e.hurtAt<.24)pose=4;else if(battle!.time-e.strikeAt<.32)pose=3;else if(e.windup>0)pose=2;}const f=creatureFrame(s.kind,pose),attack=e&&battle!.time-e.strikeAt<.3?Math.sin((battle!.time-e.strikeAt)/.3*Math.PI)*.22:0;this.transient(this.billboard(s.x*CELL-Math.cos(camera.yaw)*attack,s.y*CELL-Math.sin(camera.yaw)*attack,f.width*s.scale,f.height*s.scale,camera.yaw,f.uv),this.atlas,e&&e.frozen&&e.stunned>0?[.56,.94,1]:e&&battle!.time-e.hurtAt<.18?[1.4,.74,.65]:[1,1,1],1);
     }
     gl.depthMask(true);
+  }
+
+  private drawEstuaryControls(g:Game){
+    const c=g.campaign!,props:number[]=[];
+    for(const [point,operated] of [[SLUICE_WHEEL,c.stage>=ESTUARY_STAGE.drained],[TIDE_GATE,c.stage>=ESTUARY_STAGE.ferrymaster]] as const){
+      const x=point.x*CELL,z=point.y*CELL-.67,angle=operated?.55:0;
+      for(let i=0;i<20;i++){
+        const a=i*Math.PI/10+angle;
+        regionBox(props,x+.42*Math.cos(a),1.24+.42*Math.sin(a),z,.15,.15,.10);
+      }
+      for(let i=0;i<5;i++){
+        const a=i*Math.PI*2/5+angle;
+        for(let r=.04;r<.43;r+=.06)regionBox(props,x+r*Math.cos(a),1.24+r*Math.sin(a),z,.095,.095,.10);
+      }
+    }
+    const x=BELL_STEPS.x*CELL,z=(BELL_STEPS.y-.47)*CELL;
+    if(!c.bellShortcut)regionBox(props,x,.03,z,1.46,2.16,.13);
+    else regionBox(props,x+.77,.03,z+.72,.13,2.16,1.46);
+    const closed=c.stage>=ESTUARY_STAGE.ferrymaster;
+    const gateX=(TIDE_GATE.x+.55)*CELL,gateZ=TIDE_GATE.y*CELL;
+    for(const edge of [-1.3,1.3])regionBox(props,gateX,-.72,gateZ+edge,.29,3.05,.23);
+    regionBox(props,gateX,closed?-.59:1.05,gateZ,.23,1.22,CELL);
+    this.transient(props,this.white,[.48,.35,.19]);
+
+    if(c.stage<ESTUARY_STAGE.alone){
+      const hull:number[]=[],bx=22.4*CELL,bz=11.55*CELL;
+      for(let i=-6;i<=6;i++){
+        const width=1.01*(1-(i/7)**2);
+        regionBox(hull,bx,-.62,bz+i*.39,width,.55,.4);
+      }
+      regionBox(hull,bx,-.15,bz,.09,2.7,.09);
+      this.transient(hull,this.materials.get('wood')??this.white,[.84,.68,.51]);
+    }
+
+    const fill=c.stage<ESTUARY_STAGE.drained?1:Math.max(0,1-(g.playTime-(c.sluiceLoweredAt??-3))/1.8);
+    if(fill>0){
+      const water:number[]=[],wx=LOCK_STAIRS.x*CELL,wz=LOCK_STAIRS.y*CELL,h=.17+fill*.69;
+      regionQuad(water,[wx-1.10,h,wz-1.23],[wx+1.10,h,wz-1.23],[wx+1.10,h,wz+1.19],[wx-1.10,h,wz+1.19],[0,1,0]);
+      this.transient(water,this.white,[.17,.39,.43],3.25,.91);
+    }
   }
 
 }
@@ -243,7 +297,7 @@ export function drawMap(canvas:HTMLCanvasElement,g:Game,full=false){
     if(!seen.has(`${x},${y}`))continue;const px=ox+x*size,py=oy+y*size;
     ctx.fillStyle=map[y][x]==='#'?'#3f5355':'#172e31';ctx.fillRect(px+1,py+1,size-2,size-2);
     if(map[y][x]==='#')continue;
-    const p={x,y};let color='';if(region?.passages.some(q=>same(p,q)))color='#80d6c7';if(region?.residents.some(q=>same(p,q)))color='#e2c476';if((!region||region.zone==='crypts')&&same(p,CHEST))color=g.chestOpen?'#70634c':'#d9b574';if((!region||region.zone==='crypts')&&same(p,SHRINE))color='#80d6c7';if((!region||region.zone==='crypts')&&same(p,GATE)&&!g.gateOpen)color='#c8885a';if((!region||region.zone==='crypts')&&same(p,EXIT))color='#c8ebe4';
+    const p={x,y};let color='';if(region?.passages.some(q=>same(p,q)))color='#80d6c7';if(region?.residents.some(q=>same(p,q))||region?.entrances.some(q=>same(p,q)))color='#e2c476';if(region?.zone==='estuary'&&[SLUICE_WHEEL,TIDE_GATE].some(q=>same(p,q)))color='#86c2bb';if((!region||region.zone==='crypts')&&same(p,CHEST))color=g.chestOpen?'#70634c':'#d9b574';if((!region||region.zone==='crypts')&&same(p,SHRINE))color='#80d6c7';if((!region||region.zone==='crypts')&&same(p,GATE)&&!g.gateOpen)color='#c8885a';if((!region||region.zone==='crypts')&&same(p,EXIT))color='#c8ebe4';
     if((region?.encounters??ENCOUNTERS).some(e=>same(e,p)&&encounterActive(g,e.id)))color='#c27569';
     if(color){ctx.fillStyle=color;ctx.beginPath();ctx.arc(px+size/2,py+size/2,size*.18,0,Math.PI*2);ctx.fill();}
   }

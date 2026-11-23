@@ -21,7 +21,7 @@ export const DIRECTIONS = [[1,0],[0,1],[-1,0],[0,-1]] as const;
 export const CARDINALS = ['E','S','W','N'];
 export interface Point { x:number; y:number }
 export type CreatureKind = 'scavenger'|'wraith'|'sentinel';
-export interface EncounterDef extends Point { id:string; kind:CreatureKind }
+export interface EncounterDef extends Point { id:string; kind:CreatureKind; name?:string; strength?:number }
 export const ENCOUNTERS:EncounterDef[] = [
   {id:'first',x:5,y:1,kind:'scavenger'},
   {id:'watch',x:3,y:5,kind:'wraith'},

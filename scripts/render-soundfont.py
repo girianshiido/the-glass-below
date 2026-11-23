@@ -17,13 +17,25 @@ def vlq(n):
  return bytes(b)
 def score(name,bpm,bars,passes):
  length=bars*4;events=[];notes=[]
- patches={'title':[49,43,8,52],'village':[46,43,68,48],'road':[45,43,73,48]}.get(name,[49 if name=='level' else 45 if name=='combat' else 48,43,8 if name!='boss' else 60,52])
+ patches={'title':[49,43,8,52],'village':[46,43,68,48],'road':[45,43,73,48],'estuary':[14,42,71,50]}.get(name,[49 if name=='level' else 45 if name=='combat' else 48,43,8 if name!='boss' else 60,52])
  for ch,program in enumerate(patches):
   events.extend([(0,-3,bytes([0xc0|ch,program])),(0,-2,bytes([0xb0|ch,7,[72,83,77,55][ch]])),(0,-2,bytes([0xb0|ch,10,[38,64,90,72][ch]])),(0,-2,bytes([0xb0|ch,91,48]))])
  def note(ch,pitch,at,dur,vel):notes.append((ch,pitch,at,dur,vel))
  chords=[(50,57,62,65),(46,53,58,62),(48,55,60,65),(45,52,57,60)];melody=[74,77,81,79,77,74,72,69]
  for bar in range(bars):
   chord=chords[(bar//2)%4];root=chord[0];at=bar*4
+  if name=='estuary':
+   harmony=[(50,57,64),(46,53,62),(43,50,57),(45,52,58),(50,57,65),(48,55,62)][bar//2]
+   if bar%2==0:
+    for pitch in harmony:note(3,pitch,at,7.65,37)
+    note(1,harmony[0]-12,at+.18,7.1,57)
+   if bar in (0,4,8):
+    for off,duration,velocity in [(0,.27,58),(.75,.32,51),(1.5,2.35,63)]:note(0,74,at+off,duration,velocity)
+   phrase=[None,69,72,70,None,65,67,69,None,74,70,69]
+   if phrase[bar]:
+    note(2,phrase[bar],at+.5,1.86,57)
+    note(2,phrase[bar]-2,at+2.75,1.05,48)
+   continue
   if name in ('title','village','road'):
    if name=='title':
     for pitch in chord:note(0,pitch,at,3.8,43)
@@ -81,7 +93,7 @@ def score(name,bpm,bars,passes):
  return b'MThd'+struct.pack('>IHHH',6,0,1,PPQ)+b'MTrk'+struct.pack('>I',len(data))+data,len(notes),tempo
 with tempfile.TemporaryDirectory(prefix='glass-fluidsynth-') as folder:
  tmp=Path(folder)
- for name,bpm,bars in [('level',72,16),('combat',116,12),('boss',136,12),('title',68,12),('village',86,16),('road',100,16)]:
+ for name,bpm,bars in [('level',72,16),('combat',116,12),('boss',136,12),('title',68,12),('village',86,16),('road',100,16),('estuary',68,12)]:
   if os.environ.get('GLASS_TRACKS') and name not in os.environ['GLASS_TRACKS'].split(','):continue
   editable,count,tempo=score(name,bpm,bars,1);(MIDI/(name+'.mid')).write_bytes(editable)
   rendered,_,_=score(name,bpm,bars,3);mid=tmp/(name+'.mid');mid.write_bytes(rendered);wav=tmp/(name+'.wav')
