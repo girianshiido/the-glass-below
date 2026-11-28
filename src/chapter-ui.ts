@@ -34,7 +34,7 @@ export class ChapterUI{
      ? '“Two short notes, then one long. That was how my brother called me home.”'
      : '“The coast road branches north from the pines. Neris keeps the boathouse at Saltreach.”';
    const invitation=rumor
-     ? this.dialogue('L',line)+this.dialogue('E','“Then ask Neris. Take the stone arch on the north side of the first forest clearing. The path beyond it leads to Saltreach.”')
+     ? this.dialogue('L',line)+this.dialogue('E','“Then ask Neris. Follow the side trail north from the first forest clearing. It passes under the old tollgate in the rocks. The path beyond it leads to Saltreach.”')
      : this.dialogue('E',line);
    this.show('Elder Elara',invitation+(rumor?'<button class="primary" data-chapter="follow-bell">Follow the bell</button>':'')+report);
    return;
@@ -149,7 +149,7 @@ export class ChapterUI{
  region(){
    const g=this.get(),c=g.campaign!,showCoast=c.stage>=ESTUARY_STAGE.trail;
    const nodes:[Zone,string][]=[['village','Rest & supplies'],['road','Eastern village gate'],['glassworks','Beyond the pine road'],['crypts','Below the glassworks']];
-   if(showCoast)nodes.push(['estuary','Coastal arch off the pine road'],['lockworks','Beneath the quay']);
+   if(showCoast)nodes.push(['estuary','Old tollgate off the pine road'],['lockworks','Beneath the quay']);
    this.show('The Greyhaven Coast',`<div class="region-map ${showCoast?'expanded':''}">
      <svg viewBox="0 0 500 300" aria-hidden="true">
        <path class="coast" d="M0 210Q110 110 180 178T310 230T500 220V300H0Z"/>

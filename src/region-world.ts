@@ -19,7 +19,9 @@ export const VILLAGE_DETAILS=[[10,8],[8,8],[12,8],[7,9],[13,9]]as const;
 village[8][20]='.';for(const[x,y]of VILLAGE_DETAILS)village[y][x]='#';
 // A narrow woodland trail, with small clearings and connected steps at its bends.
 let previous=10;for(let x=0;x<25;x++){const center=x<9?10:x<17?10-Math.floor((x-8)/2):6;for(let y=Math.min(previous,center);y<=Math.max(previous,center);y++)road[y][x]='.';if(x<4)for(let y=9;y<=11;y++)road[y][x]='.';previous=center;}
-rect(road,10,8,3,3,'.');rect(road,18,5,3,3,'.');road[10][0]='.';road[6][24]='.';road[ROAD_TO_ESTUARY.y][ROAD_TO_ESTUARY.x]='.';
+rect(road,10,8,3,3,'.');rect(road,18,5,3,3,'.');road[10][0]='.';road[6][24]='.';
+// The coastal road branches north into a narrow cut, beyond the first clearing.
+for(let y=ROAD_TO_ESTUARY.y;y<8;y++)road[y][ROAD_TO_ESTUARY.x]='.';
 // Broad furnace and workshop halls, with a traversable opening between their columns.
 rect(works,3,4,4,4);rect(works,16,4,4,4);rect(works,3,12,4,3);rect(works,17,12,3,3);
 for(const [x,y]of [[9,5],[13,5],[9,12],[13,12]])works[y][x]='#';
@@ -90,7 +92,7 @@ export function passageHint(g:Game,p:Passage){
     'warehouse-walkway':stage<ESTUARY_STAGE.sluice?'Ask the ferrymaster about the bonded warehouse.':'Raise the sluice to float the walkway.',
     'warehouse-return':'Use the culvert, or raise the walkway from Saltreach.',
     'warehouse-culvert':lowWater(g)?'The culvert bolts open from below.':'Lower the water before entering the culvert.',
-    'estuary-arch':'The coastal arch is locked.',
+    'estuary-arch':'The old tollgate is locked.',
     'lock-stairs':'Water covers the lower stairs.',
     'bell-stairs':'The Keeper is still guarding the tower stairs.',
     'bell-shortcut':cShortcutMessage(g),
@@ -134,7 +136,20 @@ export function encounterPresent(g:Game,id:string){
   return !g.cleared.has(id)||g.roaming.has(id);
 }
 export function roadThreat(g:Game){if(g.campaign?.zone!=='road'||g.phase!=='explore')return;return regionOf(g).encounters.filter(e=>encounterPresent(g,e.id)&&Math.hypot(e.x-g.position.x,e.y-g.position.y)<=2.15&&regionSight('road',g.position,e)).sort((a,b)=>Math.hypot(a.x-g.position.x,a.y-g.position.y)-Math.hypot(b.x-g.position.x,b.y-g.position.y))[0];}
+// After the gate, the coastal road bends behind the far shoulder of the ravine.
+const {x:coastalX,y:coastalY}=ROAD_TO_ESTUARY;
+export const COASTAL_TRAIL_VIEW=[
+  ROAD_TO_ESTUARY,
+  {x:coastalX,y:coastalY-1.3},
+  {x:coastalX+.3,y:coastalY-2.2},
+  {x:coastalX+1.25,y:coastalY-3.15},
+  {x:coastalX+2.6,y:coastalY-3.35},
+];
 const trailSegments:{ax:number;ay:number;bx:number;by:number}[]=[];
 for(let y=0;y<road.length;y++)for(let x=0;x<road[0].length;x++)if(road[y][x]==='.')for(const[dx,dy]of [[1,0],[0,1]])if(road[y+dy]?.[x+dx]==='.')trailSegments.push({ax:x,ay:y,bx:x+dx,by:y+dy});
+for(let i=1;i<COASTAL_TRAIL_VIEW.length;i++){
+  const a=COASTAL_TRAIL_VIEW[i-1],b=COASTAL_TRAIL_VIEW[i];
+  trailSegments.push({ax:a.x,ay:a.y,bx:b.x,by:b.y});
+}
 /** Soft, uneven banks follow the connected path rather than the square tile perimeter. */
 export function trailCoverage(x:number,y:number){let distance=Infinity;for(const s of trailSegments){const dx=s.bx-s.ax,dy=s.by-s.ay,t=Math.max(0,Math.min(1,((x-s.ax)*dx+(y-s.ay)*dy)/(dx*dx+dy*dy)));distance=Math.min(distance,Math.hypot(x-s.ax-t*dx,y-s.ay-t*dy));}const rough=.047*Math.sin(x*17+y*23)+.035*Math.sin(x*37-y*13)+.025*Math.sin(x*7+y*9),width=.48+.065*Math.sin(x*1.9+y*.8)+rough;return Math.max(0,Math.min(1,(width+.13-distance)/.22));}

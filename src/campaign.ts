@@ -58,7 +58,7 @@ export function campaignObjective(g:Game){
     'Speak to Elder Elara in Greyhaven','Clear the three threats on the Old Pine Road',
     'Continue through the glassworks entrance, or report to Elara','Investigate the abandoned glassworks',
     'Speak to Lys at the glassworks','Find the memory prism beneath the glassworks','Return to Elder Elara with the prism',
-    'Speak to Elara about the bell beyond the pines','Take the coastal arch off Old Pine Road and find the ferrymaster',
+    'Speak to Elara about the bell beyond the pines','Take the old tollgate off Old Pine Road and find the ferrymaster',
     'Turn the sluice wheel above Saltreach','Descend under the quay and find the source of the bell',
     c.bellShortcut?'Meet Lys at the mooring by the cargo boat':'Climb the bell tower stairs and unbolt the door',
     'Follow the lower quay east and close the tide gate','Return to Neris at her boathouse',

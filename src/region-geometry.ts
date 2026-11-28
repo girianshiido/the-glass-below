@@ -1,12 +1,12 @@
 import {EXPEDITION_FIXTURES,FLOATING_WALKWAY,BELL_BARRIER} from './expedition-world.ts';
 import {isFloatingWalkway} from './expedition-state.ts';
-import {BELL_STEPS,LOCK_STAIRS,SLUICE_WHEEL,TIDE_GATE} from './estuary-world.ts';
-import {REGION_WORLDS,regionWall,VILLAGE_DETAILS,trailCoverage} from './region-world.ts';
+import {BELL_STEPS,LOCK_STAIRS,SLUICE_WHEEL,TIDE_GATE,ROAD_TO_ESTUARY} from './estuary-world.ts';
+import {REGION_WORLDS,regionWall,VILLAGE_DETAILS,trailCoverage,COASTAL_TRAIL_VIEW} from './region-world.ts';
 import type {Zone} from './campaign.ts';
 export type Vec=[number,number,number];
 export const CELL=2.6;
-export type Material='stone'|'floor'|'cobble'|'wood'|'plaster'|'roof'|'grass'|'path'|'leaf'|'metal'|'glass'|'water'|'mountain'|'shadow'|'coolglass'|'ember'|'fieldstone'|'brick'|'cutstone';
-export const COLORS:Record<Material,Vec>={cutstone:[.87,.88,.8],fieldstone:[1,.97,.88],brick:[1.3,.78,.55],ember:[1,.55,.17],coolglass:[.2,.78,.81],shadow:[.03,.06,.05],cobble:[.86,.9,.84],stone:[.66,.72,.7],floor:[.73,.77,.72],wood:[.95,.9,.84],plaster:[1,1,1],roof:[.9,1,.98],grass:[.31,.48,.34],path:[1,1,1],leaf:[.18,.34,.28],metal:[.47,.35,.22],glass:[1,.94,.86],water:[.35,.63,.7],mountain:[.3,.42,.46]};
+export type Material='stone'|'floor'|'cobble'|'wood'|'plaster'|'roof'|'grass'|'path'|'leaf'|'metal'|'glass'|'water'|'mountain'|'shadow'|'coolglass'|'ember'|'fieldstone'|'brick'|'cutstone'|'cliff';
+export const COLORS:Record<Material,Vec>={cliff:[.59,.66,.63],cutstone:[.87,.88,.8],fieldstone:[1,.97,.88],brick:[1.3,.78,.55],ember:[1,.55,.17],coolglass:[.2,.78,.81],shadow:[.03,.06,.05],cobble:[.86,.9,.84],stone:[.66,.72,.7],floor:[.73,.77,.72],wood:[.95,.9,.84],plaster:[1,1,1],roof:[.9,1,.98],grass:[.31,.48,.34],path:[1,1,1],leaf:[.18,.34,.28],metal:[.47,.35,.22],glass:[1,.94,.86],water:[.35,.63,.7],mountain:[.3,.42,.46]};
 export function quad(out:number[],a:Vec,b:Vec,c:Vec,d:Vec,n:Vec,uv=[0,0,1,1]){const[u0,v0,u1,v1]=uv;for(const[p,u,v]of [[a,u0,v0],[b,u1,v0],[c,u1,v1],[a,u0,v0],[c,u1,v1],[d,u0,v1]]as [Vec,number,number][])out.push(...p,...n,u,v);}
 export function box(out:number[],x:number,y:number,z:number,w:number,h:number,d:number){const a=x-w/2,b=x+w/2,c=z-d/2,e=z+d/2,t=y+h;quad(out,[a,y,c],[b,y,c],[b,t,c],[a,t,c],[0,0,-1],[0,0,w/2.6,h/2.6]);quad(out,[b,y,e],[a,y,e],[a,t,e],[b,t,e],[0,0,1],[0,0,w/2.6,h/2.6]);quad(out,[a,y,e],[a,y,c],[a,t,c],[a,t,e],[-1,0,0],[0,0,d/2.6,h/2.6]);quad(out,[b,y,c],[b,y,e],[b,t,e],[b,t,c],[1,0,0],[0,0,d/2.6,h/2.6]);quad(out,[a,t,c],[b,t,c],[b,t,e],[a,t,e],[0,1,0]);}
 export function cone(out:number[],x:number,z:number,y:number,r:number,h:number,sides=10){for(let k=0;k<sides;k++){const a=k*Math.PI*2/sides,b=(k+1)*Math.PI*2/sides;quad(out,[x+Math.cos(a)*r,y,z+Math.sin(a)*r],[x+Math.cos(b)*r,y,z+Math.sin(b)*r],[x,y+h,z],[x,y+h,z],[Math.cos((a+b)/2),r/h,Math.sin((a+b)/2)]);}}
@@ -16,7 +16,7 @@ function fountain(stone:number[],water:number[]){const x=10*CELL,z=8*CELL;cylind
 function hangingEmblem(wood:number[],metal:number[],x:number,z:number,shop:boolean){box(metal,x,2.65,z-.25,.08,.08,.7);for(const side of [-1,1])box(metal,x+side*.24,2.19,z,.035,.45,.035);const points=[[-.45,.3],[.36,.35],[.49,.1],[.38,-.32],[.06,-.41],[-.4,-.28],[-.5,.07]];for(let k=0;k<points.length;k++){const a=points[k],b=points[(k+1)%points.length];quad(wood,[x,1.97,z],[x+a[0],1.97+a[1],z],[x+b[0],1.97+b[1],z],[x,1.97,z],[0,0,1]);}if(shop){box(metal,x,1.73,z+.03,.055,.48,.04);box(metal,x,1.86,z+.04,.3,.05,.045);cone(metal,x,z+.04,2.21,.07,.1,4);}else{box(metal,x-.04,1.77,z+.03,.26,.31,.035);for(const dy of [0,.2])box(metal,x+.17,1.8+dy,z+.04,.15,.04,.04);box(metal,x+.23,1.8,z+.04,.04,.24,.04);}}
 function pine(leaves:number[],trunk:number[],shadows:number[],x:number,z:number,h:number,seed:number){box(trunk,x,0,z,.3,h,.33);for(let layer=0;layer<6;layer++){const base=1.2+layer*h*.13,r=(h*.29)*(1-layer*.12),top=base+h*.44;for(let k=0;k<9;k++){const a=k*Math.PI*2/9,b=(k+1)*Math.PI*2/9,ra=r*(.88+.14*Math.sin(k*13+seed)),rb=r*(.88+.14*Math.sin((k+1)*13+seed));quad(leaves,[x+Math.cos(a)*ra,base+Math.sin(k*7+seed)*.2,z+Math.sin(a)*ra],[x+Math.cos(b)*rb,base+Math.sin((k+1)*7+seed)*.2,z+Math.sin(b)*rb],[x,top,z],[x,top,z],[Math.cos((a+b)/2),.48,Math.sin((a+b)/2)]);}}
  for(let k=0;k<12;k++){const a=k*Math.PI/6,b=(k+1)*Math.PI/6;quad(shadows,[x,.012,z],[x+Math.cos(a)*h*.3,.012,z+Math.sin(a)*h*.3],[x+Math.cos(b)*h*.3,.012,z+Math.sin(b)*h*.3],[x,.012,z],[0,1,0]);}}
-export function forestTrees(){const trees:{x:number;z:number;height:number;radius:number;seed:number}[]=[],map=REGION_WORLDS.road.map,tiles=map.flatMap((row,y)=>[...row].flatMap((c,x)=>c==='.'?[{x:x*CELL,z:y*CELL}]:[]));for(let y=-3;y<map.length+3;y++)for(let x=1;x<map[0].length+3;x++){if(!regionWall('road',x,y)||x>23&&Math.abs(y-6)<2)continue;const tx=x*CELL+Math.sin(x*73+y*19)*.65,tz=y*CELL+Math.sin(y*17+x)*.65,h=6.4+2*Math.sin(x*5+y*8),radius=h*.29*1.03;if(tiles.some(p=>Math.hypot(Math.max(0,Math.abs(tx-p.x)-CELL/2),Math.max(0,Math.abs(tz-p.z)-CELL/2))<radius+.45))continue;trees.push({x:tx,z:tz,height:h,radius,seed:x*31+y*7});}return trees;}
+export function forestTrees(){const trees:{x:number;z:number;height:number;radius:number;seed:number}[]=[],map=REGION_WORLDS.road.map,tiles=map.flatMap((row,y)=>[...row].flatMap((c,x)=>c==='.'?[{x:x*CELL,z:y*CELL}]:[]));for(let y=-3;y<map.length+3;y++)for(let x=1;x<map[0].length+3;x++){if(!regionWall('road',x,y)||x>23&&Math.abs(y-6)<2)continue;const tx=x*CELL+Math.sin(x*73+y*19)*.65,tz=y*CELL+Math.sin(y*17+x)*.65,h=6.4+2*Math.sin(x*5+y*8),radius=h*.29*1.03;if(coastalTreeClearance(tx,tz,radius))continue;if(tiles.some(p=>Math.hypot(Math.max(0,Math.abs(tx-p.x)-CELL/2),Math.max(0,Math.abs(tz-p.z)-CELL/2))<radius+.45))continue;trees.push({x:tx,z:tz,height:h,radius,seed:x*31+y*7});}return trees;}
 export function regionGeometry(zone:Zone){const w=REGION_WORLDS[zone],groups={}as Record<Material,number[]>;for(const k of Object.keys(COLORS)as Material[])groups[k]=[];const {stone,floor,cobble,wood,plaster,roof,grass,path,leaf,metal,glass,water,mountain,shadow,coolglass,ember,fieldstone,brick,cutstone}=groups;
  const width=w.map[0].length,height=w.map.length;
  if(zone==='village'){quad(grass,[-90,-.07,-90],[150,-.07,-90],[150,-.07,150],[-90,-.07,150],[0,1,0],[0,0,30,30]);for(let k=0;k<26;k++){const a=k*Math.PI*2/26,r=150+10*Math.sin(k*9);cone(mountain,20*CELL+Math.cos(a)*r,8*CELL+Math.sin(a)*r,-4,23+9*Math.sin(k*4),25+12*Math.sin(k*7),6);}}
@@ -68,6 +68,7 @@ export function regionGeometry(zone:Zone){const w=REGION_WORLDS[zone],groups={}a
   quad(path,[-CELL/2,0,-CELL/2],[(width-.5)*CELL,0,-CELL/2],[(width-.5)*CELL,0,(height-.5)*CELL],[-CELL/2,0,(height-.5)*CELL],[0,1,0],[0,0,width,height]);
   for(const t of forestTrees())pine(leaf,wood,shadow,t.x,t.z,t.height,t.seed);
   for(let y=0;y<height;y+=.21)for(let x=0;x<width;x+=.23){const tx=x+.045*Math.sin(y*57+x*9),tz=y+.045*Math.sin(x*31),cover=trailCoverage(tx,tz);if(cover<.03||cover>.36)continue;const px=tx*CELL,pz=tz*CELL,h=.12+.14*(.5+.5*Math.sin(x*53+y*19));for(let k=0;k<3;k++){const a=k*Math.PI/3,s=Math.sin(a)*.035,c=Math.cos(a)*.035;quad(leaf,[px-s,.01,pz-c],[px+s,.01,pz+c],[px+.05*Math.sin(x),h,pz+.04*Math.cos(y)],[px+.05*Math.sin(x),h,pz+.04*Math.cos(y)],[Math.sin(a),.3,Math.cos(a)]);}}
+  coastalTollgate(groups);
   // The glassworks is visible at the end of the forest, well before the entrance.
   const ex=26*CELL,ez=6*CELL;box(stone,ex,0,ez,8,7.4,15);box(roof,ex,7.4,ez,8.8,.45,16);for(const z of [-5,5]){box(metal,ex+1,7.7,ez+z,1.5,8,1.5);for(let k=0;k<3;k++)box(metal,ex+1,9+k*2,ez+z,1.7,.16,1.7);}box(wood,24*CELL+.12,0,ez,.1,3.2,2.3);for(const z of [-4,4])box(glass,24.43*CELL,3.9,ez+z,.05,2.3,2.1);
  }
@@ -85,7 +86,7 @@ export function regionGeometry(zone:Zone){const w=REGION_WORLDS[zone],groups={}a
  if(zone==='annealing')annealingArchitecture(groups);
  if(zone==='warehouse')warehouseArchitecture(groups);
  // Physical lintels and stair treads distinguish exits from blank walls.
- for(const p of w.passages){if(p.id==='pine-gate'||p.id==='village-return'||p.id==='bell-shortcut')continue;const x=p.id==='crypt-return'?.28*CELL:p.x*CELL,z=p.y*CELL,stair=p.id.includes('stairs')||p.id==='crypt-return',alongX=p.id==='crypt-return'||p.id==='warehouse-walkway'||p.id==='lock-culvert'||p.id==='warehouse-culvert'||p.x===0||p.x===width-1;
+ for(const p of w.passages){if(p.id==='pine-gate'||p.id==='village-return'||p.id==='bell-shortcut'||p.id==='estuary-arch')continue;const x=p.id==='crypt-return'?.28*CELL:p.x*CELL,z=p.y*CELL,stair=p.id.includes('stairs')||p.id==='crypt-return',alongX=p.id==='crypt-return'||p.id==='warehouse-walkway'||p.id==='lock-culvert'||p.id==='warehouse-culvert'||p.x===0||p.x===width-1;
   for(const side of [-1,1])box(stone,x+(alongX?0:side*1.15),0,z+(alongX?side*1.15:0),alongX?.35:.25,3.15,alongX?.25:.35);box(stone,x,3.05,z,alongX?.35:2.6,.23,alongX?2.6:.35);
   if(stair){for(let k=0;k<7;k++)box(stone,x+(alongX?(k-3)*.29:0),.025+k*.075,z+(alongX?0:(k-3)*.29),alongX?.31:1.85,.08,alongX?1.85:.31);
    // Open handrails, with separated posts rather than opaque bronze slabs.
@@ -93,6 +94,111 @@ export function regionGeometry(zone:Zone){const w=REGION_WORLDS[zone],groups={}a
  }
 
  return groups;
+}
+
+const COASTAL_OPENING={halfWidth:1.07,spring:1.94,outerRadius:1.47,depth:.78};
+
+// Separate rock masses flank the cut. Near the entrance they taper away
+// from the trail, while the far shoulder hides the end of the visible bend.
+const COASTAL_ROCKS=[
+  {x:-3.21,z:1.85,w:2.1,d:3.65,h:3.98,seed:1},
+  {x:-5.25,z:.32,w:2.0,d:3.5,h:2.85,seed:2},
+  {x:-2.59,z:-3.15,w:1.52,d:3.0,h:3.27,seed:3},
+  {x:-4.58,z:4.75,w:2.4,d:2.2,h:1.71,seed:4},
+  {x:3.27,z:1.2,w:2.12,d:3.38,h:3.7,seed:5},
+  {x:5.31,z:1.5,w:2.18,d:3.1,h:2.76,seed:6},
+  {x:3.64,z:-3.6,w:2.42,d:2.88,h:3.54,seed:7},
+  {x:4.55,z:4.6,w:1.7,d:2.55,h:1.52,seed:8},
+  {x:9.1,z:-8,w:3.25,d:2.28,h:3.31,seed:9},
+];
+const coastalGateX=ROAD_TO_ESTUARY.x*CELL,coastalGateZ=ROAD_TO_ESTUARY.y*CELL;
+
+function coastalTreeClearance(x:number,z:number,radius:number){
+  const nearRock=COASTAL_ROCKS.some(r=>Math.hypot(
+    Math.max(0,Math.abs(x-coastalGateX-r.x)-r.w),
+    Math.max(0,Math.abs(z-coastalGateZ-r.z)-r.d),
+  )<radius+.25);
+  if(nearRock)return true;
+  for(let i=1;i<COASTAL_TRAIL_VIEW.length;i++){
+    const a=COASTAL_TRAIL_VIEW[i-1],b=COASTAL_TRAIL_VIEW[i];
+    const dx=b.x-a.x,dz=b.y-a.y;
+    const span=Math.max(0,Math.min(1,((x/CELL-a.x)*dx+(z/CELL-a.y)*dz)/(dx*dx+dz*dz)));
+    if(Math.hypot(x-(a.x+span*dx)*CELL,z-(a.y+span*dz)*CELL)<radius+1.45)return true;
+  }
+  return false;
+}
+
+function bluff(out:number[],x:number,z:number,width:number,depth:number,height:number,seed:number){
+  const sides=7;
+  const point=(i:number,tier:number):Vec=>{
+    const a=i*Math.PI*2/sides;
+    const scale=(tier===0?1:tier===1?.88:.54)*(.85+.13*Math.sin(i*3.1+seed));
+    const lift=tier===0?0:tier===1?.59+.12*Math.cos(i*2.7+seed):.93+.07*Math.sin(i*2+seed);
+    return [x+Math.cos(a)*width*scale+.15*tier,height*lift,z+Math.sin(a)*depth*scale-.1*tier];
+  };
+  for(let i=0;i<sides;i++){
+    const j=(i+1)%sides,a=(i+.5)*Math.PI*2/sides;
+    quad(out,point(i,0),point(j,0),point(j,1),point(i,1),[Math.cos(a),.18,Math.sin(a)]);
+    quad(out,point(i,1),point(j,1),point(j,2),point(i,2),[Math.cos(a)*.8,.63,Math.sin(a)*.8]);
+    quad(out,[x+.3,height,z-.2],point(i,2),point(j,2),[x+.3,height,z-.2],[0,1,0]);
+  }
+}
+
+function coastalTollgate({fieldstone,cutstone,cliff,wood,metal}:Record<Material,number[]>){
+  const x=coastalGateX,z=coastalGateZ;
+  const {halfWidth,spring,outerRadius,depth}=COASTAL_OPENING;
+  for(const r of COASTAL_ROCKS)bluff(cliff,x+r.x,z+r.z,r.w,r.d,r.h,r.seed);
+
+  // Retaining walls bridge the stone jambs and the irregular rock faces.
+  for(const side of [-1,1]){
+    const jamb=side*(outerRadius+halfWidth)/2;
+    box(cutstone,x+jamb,0,z,outerRadius-halfWidth,spring,depth);
+    box(cutstone,x+side*1.31,.01,z,.46,.21,depth+.14);
+    box(cutstone,x+side*1.32,spring-.15,z,.57,.16,depth+.12);
+    box(fieldstone,x+side*2.23,0,z,1.57,3.18,1.46);
+    box(fieldstone,x+side*3.62,0,z-.19,1.41,2.23,1.44);
+    box(cutstone,x+side*2.23,3.16,z,1.61,.14,1.54);
+  }
+
+  // The stones of the arch frame the narrower, curved iron leaves.
+  const point=(angle:number,r:number,side:number):Vec=>[x+r*Math.cos(angle),spring+r*Math.sin(angle),z+side*depth/2];
+  for(let i=0;i<11;i++){
+    const a=i*Math.PI/11+.009,b=(i+1)*Math.PI/11-.009;
+    const outside=outerRadius+(i===5?.115:.014*Math.sin(i*8));
+    for(const side of [-1,1])quad(cutstone,point(a,halfWidth,side),point(b,halfWidth,side),point(b,outside,side),point(a,outside,side),[0,0,side]);
+    const mid=(a+b)/2;
+    quad(cutstone,point(a,halfWidth,-1),point(b,halfWidth,-1),point(b,halfWidth,1),point(a,halfWidth,1),[-Math.cos(mid),-Math.sin(mid),0]);
+    quad(cutstone,point(a,outside,1),point(b,outside,1),point(b,outside,-1),point(a,outside,-1),[Math.cos(mid),Math.sin(mid),0]);
+  }
+
+  // Short cobbled threshold and an old wooden waymarker at the start of the bend.
+  for(let row=0;row<4;row++)for(let col=0;col<6;col++){
+    const stepX=x+(col-2.5)*.35,stepZ=z+.64-row*.42;
+    box(fieldstone,stepX,.004,stepZ,.326,.034+.008*Math.sin(row*4+col),.378);
+  }
+  const markerX=x-1.65,markerZ=z+2.23*CELL;
+  box(wood,markerX,.02,markerZ,.13,1.63,.15);
+  box(wood,markerX+.14,1.25,markerZ,.83,.25,.095);
+  quad(wood,[markerX+.55,1.2,markerZ+.05],[markerX+.81,1.375,markerZ+.05],[markerX+.55,1.55,markerZ+.05],[markerX+.55,1.55,markerZ+.05],[0,0,1]);
+  for(const dx of [-.13,.27])box(metal,markerX+dx,1.33,markerZ+.065,.058,.058,.036);
+}
+
+export function coastalGateLeaves(dx:number,dz:number,open:boolean){
+  const x=coastalGateX+dx,z=coastalGateZ+dz,mesh:number[]=[];
+  const {halfWidth,spring}=COASTAL_OPENING;
+  for(const side of [-1,1]){
+    const hinge=x+side*(halfWidth-.037);
+    const point=(along:number)=>open?[hinge,z-along]:[hinge-side*along,z];
+    for(let bar=0;bar<=5;bar++){
+      const along=bar*.197+.021,[px,pz]=point(along);
+      const radial=halfWidth-.037-along;
+      box(mesh,px,.045,pz,.051,spring+Math.sqrt(halfWidth**2-radial**2)-.105,.052);
+    }
+    const [px,pz]=point(.5);
+    for(const height of [.48,1.2,1.91])box(mesh,px,height,pz,open?.077:1.02,.079,open?1.02:.077);
+  }
+  if(!open)box(mesh,x,1.16,z+.033,.19,.16,.095);
+  return mesh;
 }
 
 function estuaryArchitecture(groups:Record<Material,number[]>){
