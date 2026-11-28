@@ -3,7 +3,7 @@ import {cryptAccess,lowWater} from './expedition-state.ts';
 import type {ExpeditionProgress} from './expedition-state.ts';
 import {ESTUARY_STAGE} from './estuary-world.ts';
 export {ESTUARY_STAGE};
-import {REGION_WORLDS,regionSight,regionWall,nearbyPassage,passageLocked,sharedOutdoors,nearbyFixture,encounterPresent} from './region-world.ts';
+import {REGION_WORLDS,regionSight,regionWall,nearbyPassage,passageLocked,sharedScene,regionRotation,nearbyFixture,encounterPresent} from './region-world.ts';
 import type {Game} from './engine.ts';
 export type Zone='village'|'road'|'glassworks'|'crypts'|'estuary'|'lockworks'|'annealing'|'warehouse';
 export interface Campaign {expedition?:ExpeditionProgress;bellShortcut?:boolean;sluiceLoweredAt?:number;worldVersion?:number;worldSeen?:Partial<Record<Zone,string[]>>;villageGateOpen?:boolean;gateOpenedAt?:number;zone:Zone;stage:number;recruited:boolean;level:number;xp:number;potions:number;weapon:'iron'|'tempered';armor:'travel'|'warden';charm:boolean;introRead:boolean;roadCleared:string[];roadAwayAt:Record<string,number>;visited:Zone[]}
@@ -154,4 +154,13 @@ export function campaignAction(g:Game,action:string){const c=g.campaign;if(!c||g
  return false;
 }
 export function roadMove(g:Game,relative:number){const c=g.campaign;if(!c||c.zone!=='road'||g.phase!=='explore')return null;const d=(g.direction+relative+4)%4,dirs=[[1,0],[0,1],[-1,0],[0,-1]],next={x:g.position.x+dirs[d][0],y:g.position.y+dirs[d][1]};if(regionWall('road',next.x,next.y))return false;return REGION_WORLDS.road.encounters.find(e=>e.x===next.x&&e.y===next.y&&encounterPresent(g,e.id))??next;}
-export function crossPassage(g:Game,p=nearbyPassage(g)){if(!p||passageLocked(g,p))return false;const from=g.campaign!.zone,direction=g.direction;if(!travel(g,p.to))return false;if(p.id==='bell-stairs')g.campaign!.bellShortcut=true;if(p.id==='lock-culvert')(g.campaign!.expedition??={}).culvert=true;g.position={...p.spawn};g.direction=sharedOutdoors(from,p.to)?direction:p.direction;return true;}
+export function crossPassage(g:Game,p=nearbyPassage(g)){
+  if(!p||passageLocked(g,p))return false;
+  const from=g.campaign!.zone,direction=g.direction;
+  if(!travel(g,p.to))return false;
+  if(p.id==='bell-stairs')g.campaign!.bellShortcut=true;
+  if(p.id==='lock-culvert')(g.campaign!.expedition??={}).culvert=true;
+  g.position={...p.spawn};
+  g.direction=sharedScene(from,p.to)?(direction+regionRotation(from)-regionRotation(p.to)+4)%4:p.direction;
+  return true;
+}

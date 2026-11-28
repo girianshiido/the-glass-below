@@ -1,19 +1,19 @@
-import {EXPEDITION_FIXTURES,ANNEALING_DOOR,BELL_BARRIER} from '../src/expedition-world.ts';
+import {EXPEDITION_FIXTURES,ANNEALING_DOOR,ANNEALING_RETURN,ANNEALING_SERVICE,SERVICE_DOOR,BELL_BARRIER} from '../src/expedition-world.ts';
 import {cryptAccess,keeperAccess,lowWater} from '../src/expedition-state.ts';
 import {MOORING,SLUICE_WHEEL,TIDE_GATE,ROAD_TO_ESTUARY,COASTAL_GATE,COASTAL_BRIDGE_TILES,ESTUARY_LINK} from '../src/estuary-world.ts';
 import {CRYPT_TORCHES} from '../src/scene-lights.ts';
-import {forestTrees,CELL} from '../src/region-geometry.ts';
+import {forestTrees,CELL,regionGeometry,appendInScene} from '../src/region-geometry.ts';
 import {test} from 'node:test';import assert from 'node:assert/strict';
 import {createGame,move,interact,turn,useSkill,continueAfterBattle,partySkills} from '../src/engine.ts';
 import {setupCampaign,campaignAction,ROAD_ENCOUNTERS,companion,travel} from '../src/campaign.ts';
-import {REGION_WORLDS,regionOf,regionWall,nearbyResident,regionSight,regionOffset,sharedOutdoors,entranceAhead,nearbyEntrance,entrancePoint,residentApproach,INTERACTION_REACH,RESIDENT_STOP_DISTANCE,trailCoverage,nearbyFixture,regionObstacle} from '../src/region-world.ts';
+import {REGION_WORLDS,regionOf,regionWall,nearbyResident,regionSight,regionOffset,sharedOutdoors,entranceAhead,nearbyEntrance,entrancePoint,residentApproach,INTERACTION_REACH,RESIDENT_STOP_DISTANCE,trailCoverage,nearbyFixture,regionObstacle,regionScenePoint,regionRotation,rebaseRegionView,sharedScene} from '../src/region-world.ts';
 import {DIRECTIONS,CHEST,GATE} from '../src/world.ts';
 import {serialize,deserialize} from '../src/save.ts';
 const same=(a,b)=>a.x===b.x&&a.y===b.y;
 const point=({x,y})=>({x,y});
 function route(zone,start,goal,blocked=()=>false){const q=[{...start,path:[]}],seen=new Set([`${start.x},${start.y}`]);for(const p of q){if(same(p,goal))return p.path;for(let d=0;d<4;d++){const[dx,dy]=DIRECTIONS[d],n={x:p.x+dx,y:p.y+dy},key=`${n.x},${n.y}`;if(seen.has(key)||regionWall(zone,n.x,n.y)||blocked(n))continue;seen.add(key);q.push({...n,path:[...p.path,d]});}}}
 function win(g){g.battle.enemies[0].hp=1;g.heroes[0].mp=g.heroes[0].maxMp;g.battle.cooldowns.fracture=0;g.battle.globalCooldown=0;useSkill(g,'fracture');assert.equal(g.phase,'victory');continueAfterBattle(g);}
-function go(g,goal){for(let i=0;i<300&&!same(g.position,goal);i++){if(g.phase==='combat')win(g);const r=regionOf(g),path=route(r.zone,g.position,goal,n=>r.residents.some(p=>same(p,n)&&!(p.id==='lys'&&g.campaign.recruited))||!g.gateOpen&&r.zone==='crypts'&&same(n,GATE)||!!regionObstacle(g,n)||r.passages.some(p=>same(p,n)));assert(path?.length,`No route to ${JSON.stringify(goal)} in ${r.zone}`);while(g.direction!==path[0]&&g.phase==='explore')turn(g,1);if(g.phase==='combat'){win(g);continue;}move(g,0);if(g.phase==='combat')win(g);}assert.deepEqual(g.position,goal);}
+function go(g,goal){for(let i=0;i<300&&!same(g.position,goal);i++){if(g.phase==='combat')win(g);const r=regionOf(g),path=route(r.zone,g.position,goal,n=>r.residents.some(p=>same(p,n)&&!(p.id==='lys'&&g.campaign.recruited))||!g.gateOpen&&r.zone==='crypts'&&same(n,GATE)||!!regionObstacle(g,n)||r.passages.some(p=>p.exitDirection===undefined&&same(p,n)));assert(path?.length,`No route to ${JSON.stringify(goal)} in ${r.zone}`);while(g.direction!==path[0]&&g.phase==='explore')turn(g,1);if(g.phase==='combat'){win(g);continue;}move(g,0);if(g.phase==='combat')win(g);}assert.deepEqual(g.position,goal);}
 test('Each region supports broad spaces, visible distant scenery and collision-safe passages',()=>{
  for(const w of Object.values(REGION_WORLDS)){assert(w.map.every(row=>row.length===w.map[0].length));assert(!regionWall(w.zone,w.spawn.x,w.spawn.y));for(const p of w.passages){assert(!regionWall(w.zone,p.x,p.y));assert(!regionWall(p.to,p.spawn.x,p.spawn.y));}}
  assert(regionSight('village',{x:10,y:12},{x:10,y:9}));assert(regionSight('glassworks',{x:11,y:16},{x:11,y:8}));
@@ -28,13 +28,56 @@ test('The entire village-road-glassworks-crypt route uses physical gates and sta
  go(g,{x:23,y:6});interact(g);assert.equal(g.campaign.zone,'glassworks');assert.deepEqual(g.position,{x:11,y:16});
  go(g,{x:11,y:8});while(g.direction!==3&&g.phase==='explore')turn(g,1);if(g.phase==='combat')win(g);assert.equal(g.campaign.stage,4);
  go(g,{x:18,y:2});g.direction=1;assert.equal(nearbyResident(g,residentApproach(g)).id,'lys');assert(campaignAction(g,'recruit'));go(g,{x:19,y:1});interact(g);assert.equal(g.campaign.zone,'glassworks');
- go(g,{x:ANNEALING_DOOR.x+1,y:ANNEALING_DOOR.y});g.direction=2;assert(move(g,0));assert.equal(g.campaign.zone,'annealing');
+ go(g,ANNEALING_DOOR);g.direction=2;assert(move(g,0));assert.equal(g.campaign.zone,'annealing');
  go(g,point(EXPEDITION_FIXTURES.ledger));assert.equal(nearbyFixture(g).id,'ledger');assert(campaignAction(g,'ledger'));assert(cryptAccess(g));
- go(g,{x:11,y:2});g.direction=3;assert(!move(g,0),'Ledger alone does not open the service shortcut');
+ go(g,ANNEALING_SERVICE);g.direction=1;assert(!move(g,0),'Ledger alone does not open the service shortcut');
  for(const key of ['westBurner','eastBurner']){go(g,point(EXPEDITION_FIXTURES[key]));assert(campaignAction(g,key));}
- go(g,{x:11,y:2});g.direction=3;assert(move(g,0));assert.equal(g.campaign.zone,'glassworks');
+ go(g,ANNEALING_SERVICE);g.direction=1;assert(move(g,0));assert.equal(g.campaign.zone,'glassworks');
  go(g,{x:19,y:1});interact(g);assert.equal(g.campaign.zone,'crypts');
  go(g,{x:1,y:2});interact(g);assert.equal(g.campaign.zone,'glassworks');go(g,{x:11,y:17});interact(g);assert.equal(g.campaign.zone,'road');go(g,{x:1,y:10});interact(g);assert.equal(g.campaign.zone,'village');assert(deserialize(serialize(g)));
+});
+test('At both wing doors, crossing and immediately backing up keep the same world heading',()=>{
+ for(const [door,wing] of [[ANNEALING_DOOR,ANNEALING_RETURN],[SERVICE_DOOR,ANNEALING_SERVICE]]){
+   const g=setupCampaign(createGame());
+   Object.assign(g.campaign,{stage:5,recruited:true,zone:'glassworks',expedition:{ledger:true,westBurner:true,eastBurner:true}});
+   g.position={x:door.x+1,y:door.y};g.direction=2;
+   interact(g);
+   assert.equal(g.campaign.zone,'glassworks','A doorway does not jump from one tile away');
+   assert(move(g,0));assert.deepEqual(g.position,door);
+   assert(move(g,0));assert.equal(g.campaign.zone,'annealing');
+   assert.deepEqual(g.position,wing);
+   assert.equal(g.direction+regionRotation('annealing'),2);
+   assert.deepEqual(regionScenePoint('annealing',wing),{x:door.x-1,y:door.y});
+   assert(move(g,2));assert.equal(g.campaign.zone,'glassworks');
+   assert.deepEqual(g.position,door);assert.equal(g.direction,2);
+   assert(move(g,2));assert.deepEqual(g.position,{x:door.x+1,y:door.y});
+   assert(deserialize(serialize(g)));
+ }
+ const view={x:.19,y:11.04,yaw:Math.PI-.031};
+ const wingView=rebaseRegionView('glassworks','annealing',view);
+ assert(sharedScene('glassworks','annealing'));
+ const world=regionScenePoint('annealing',wingView);
+ assert(Math.abs(world.x-view.x)<1e-10&&Math.abs(world.y-view.y)<1e-10);
+ assert(Math.abs(wingView.yaw+regionRotation('annealing')*Math.PI/2-view.yaw)<1e-10);
+});
+
+test('The joined workshop geometry leaves both door openings clear at eye level',()=>{
+ const vertices=[];
+ for(const zone of ['glassworks','annealing']){
+   const geometry=regionGeometry(zone);
+   for(const material of ['stone','cutstone','fieldstone'])appendInScene(zone,geometry[material],vertices);
+ }
+ for(const door of [ANNEALING_DOOR,SERVICE_DOOR]){
+   const plane=(door.x-.5)*CELL,center=door.y*CELL;
+   let openBelowLintel=true;
+   for(let i=0;i<vertices.length;i+=24){
+     const xs=[vertices[i],vertices[i+8],vertices[i+16]];
+     if(!xs.every(x=>Math.abs(x-plane)<.25))continue;
+     const hs=[vertices[i+1],vertices[i+9],vertices[i+17]],zs=[vertices[i+2],vertices[i+10],vertices[i+18]];
+     if(Math.min(...hs)<1.6&&Math.max(...hs)>1.6&&Math.min(...zs)<center&&Math.max(...zs)>center)openBelowLintel=false;
+   }
+   assert(openBelowLintel,'No wall panel blocks the view of the other room through the opening');
+ }
 });
 test('Version-one chapter saves retain progression, gear, health and story when moved into the 3D world',()=>{
  const g=setupCampaign(createGame());campaignAction(g,'accept');g.campaign.zone='road';g.campaign.weapon='tempered';g.campaign.introRead=true;g.position={x:6,y:1};g.heroes[0].hp=73;g.campaign.worldVersion=undefined;g.campaign.worldSeen=undefined;

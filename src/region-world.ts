@@ -1,4 +1,4 @@
-import {ANNEALING,WAREHOUSE,ANNEALING_DOOR,SERVICE_DOOR,BELL_BARRIER,EXPEDITION_FIXTURES} from './expedition-world.ts';
+import {ANNEALING,WAREHOUSE,ANNEALING_DOOR,ANNEALING_RETURN,ANNEALING_SERVICE,SERVICE_DOOR,BELL_BARRIER,EXPEDITION_FIXTURES} from './expedition-world.ts';
 import {burnersLit,cryptAccess,keeperAccess,lowWater,isFloatingWalkway} from './expedition-state.ts';
 import {ESTUARY_STAGE,ESTUARY,LOCKWORKS,ROAD_TO_ESTUARY,COASTAL_GATE,COASTAL_BRIDGE_TILES,ESTUARY_LINK,SLUICE_WHEEL,MOORING,TIDE_GATE} from './estuary-world.ts';
 import type {Zone} from './campaign.ts';
@@ -8,7 +8,7 @@ import type {Point,EncounterDef} from './world.ts';
 export interface Building{x:number;y:number;w:number;d:number;h:number;roof:number;kind:'inn'|'shop'|'house'|'hall'|'factory'|'tower'}
 export interface Entrance extends Point{id:'inn'|'shop'|'neris';direction:number}
 export interface Resident extends Point{id:'elara'|'inn'|'shop'|'lys';name:string;frame:number}
-export interface Passage extends Point{id:string;to:Zone;spawn:Point;direction:number;label:string}
+export interface Passage extends Point{id:string;to:Zone;spawn:Point;direction:number;label:string;exitDirection?:number}
 export interface RegionWorld{zone:Zone;map:string[];spawn:Point;direction:number;buildings:Building[];residents:Resident[];entrances:Entrance[];passages:Passage[];encounters:EncounterDef[];ceiling:number;outdoor:boolean}
 const open=(w:number,h:number)=>Array.from({length:h},(_,y)=>Array.from({length:w},(_,x)=>x===0||y===0||x===w-1||y===h-1?'#':'.'));
 const rect=(m:string[][],x:number,y:number,w:number,h:number,c='#')=>{for(let j=y;j<y+h;j++)for(let i=x;i<x+w;i++)m[j][i]=c;};
@@ -26,7 +26,7 @@ for(const {x,y} of COASTAL_BRIDGE_TILES)road[y][x]='.';
 // Broad furnace and workshop halls, with a traversable opening between their columns.
 rect(works,3,4,4,4);rect(works,16,4,4,4);rect(works,3,12,4,3);rect(works,17,12,3,3);
 for(const [x,y]of [[9,5],[13,5],[9,12],[13,12]])works[y][x]='#';
-works[17][11]='.';works[18][11]='.';works[0][19]='.';works[ANNEALING_DOOR.y][ANNEALING_DOOR.x]='.';works[SERVICE_DOOR.y][SERVICE_DOOR.x]='.';
+works[17][11]='.';works[18][11]='.';works[0][19]='.';works[ANNEALING_DOOR.y][ANNEALING_DOOR.x]='.';works[SERVICE_DOOR.y][SERVICE_DOOR.x]='.';works[3][22]='.';
 // Preserve quest landmarks and the old encounter IDs while opening genuinely large crypt rooms.
 const crypt=OLD_MAP.map(r=>r.split(''));
 rect(crypt,11,1,7,4,'.');rect(crypt,3,5,5,3,'.');rect(crypt,11,10,7,2,'.');
@@ -36,7 +36,7 @@ const finish=(m:string[][])=>m.map(r=>r.join(''));
 export const REGION_WORLDS:Record<Zone,RegionWorld>={
  village:{zone:'village',map:finish(village),spawn:{x:10,y:11},direction:3,buildings,residents:[{id:'elara',name:'Elder Elara',frame:0,x:9,y:6}],entrances:[{id:'inn',x:4,y:8,direction:3},{id:'shop',x:16,y:11,direction:3}],passages:[{id:'pine-gate',x:20,y:8,to:'road',spawn:{x:0,y:10},direction:0,label:'Old Pine Road'}],encounters:[],ceiling:0,outdoor:true},
  road:{zone:'road',map:finish(road),spawn:{x:1,y:10},direction:0,buildings:[],residents:[],entrances:[],passages:[{id:'village-return',x:0,y:10,to:'village',spawn:{x:20,y:8},direction:2,label:'Greyhaven'},{id:'glassworks-door',x:24,y:6,to:'glassworks',spawn:{x:11,y:16},direction:3,label:'Enter the glassworks'},{id:'coastal-crossing',...ROAD_TO_ESTUARY,to:'estuary',spawn:ESTUARY_LINK,direction:0,label:'Follow the causeway to Saltreach'}],encounters:[{id:'road-shards',x:6,y:10,kind:'scavenger'},{id:'road-hollow',x:13,y:8,kind:'scavenger'},{id:'road-lantern',x:20,y:6,kind:'wraith'},{id:'pine-root',x:9,y:10,kind:'scavenger'},{id:'pine-bend',x:17,y:6,kind:'scavenger'}],ceiling:0,outdoor:true},
- glassworks:{zone:'glassworks',map:finish(works),spawn:{x:11,y:16},direction:3,buildings:[],residents:[{id:'lys',name:'Lys',frame:3,x:18,y:3}],entrances:[],passages:[{id:'works-return',x:11,y:18,to:'road',spawn:{x:23,y:6},direction:2,label:'Old Pine Road'},{id:'annealing-door',...ANNEALING_DOOR,to:'annealing',spawn:{x:11,y:16},direction:3,label:'Enter the annealing wing'},{id:'annealing-shortcut',...SERVICE_DOOR,to:'annealing',spawn:{x:11,y:2},direction:1,label:'Enter the annealing wing by the service passage'},{id:'crypt-stairs',x:19,y:0,to:'crypts',spawn:{x:1,y:1},direction:0,label:'Descend into the crypts'}],encounters:[{id:'furnace',kind:'wraith',x:11,y:7},{id:'kiln-crawler',kind:'scavenger',x:7,y:10},{id:'loading-bay',kind:'wraith',x:20,y:10}],ceiling:6.5,outdoor:false},
+ glassworks:{zone:'glassworks',map:finish(works),spawn:{x:11,y:16},direction:3,buildings:[],residents:[{id:'lys',name:'Lys',frame:3,x:18,y:3}],entrances:[],passages:[{id:'works-return',x:11,y:18,to:'road',spawn:{x:23,y:6},direction:2,label:'Old Pine Road'},{id:'annealing-door',...ANNEALING_DOOR,exitDirection:2,to:'annealing',spawn:ANNEALING_RETURN,direction:3,label:'Enter the annealing wing'},{id:'annealing-shortcut',...SERVICE_DOOR,exitDirection:2,to:'annealing',spawn:ANNEALING_SERVICE,direction:3,label:'Enter the annealing wing by the service passage'},{id:'crypt-stairs',x:19,y:0,to:'crypts',spawn:{x:1,y:1},direction:0,label:'Descend into the crypts'}],encounters:[{id:'furnace',kind:'wraith',x:11,y:7},{id:'kiln-crawler',kind:'scavenger',x:7,y:10},{id:'loading-bay',kind:'wraith',x:20,y:10}],ceiling:6.5,outdoor:false},
  crypts:{zone:'crypts',map:finish(crypt),spawn:{x:1,y:1},direction:0,buildings:[],residents:[],entrances:[],passages:[{id:'crypt-return',x:1,y:1,to:'glassworks',spawn:{x:19,y:1},direction:1,label:'Climb to the glassworks'},{id:'warden-stairs',x:17,y:13,to:'glassworks',spawn:{x:19,y:1},direction:1,label:'Climb to the glassworks'}],encounters:OLD_ENCOUNTERS.map(e=>({...e})),ceiling:4.3,outdoor:false},
  estuary:ESTUARY, lockworks:LOCKWORKS, annealing:ANNEALING, warehouse:WAREHOUSE,
 };
@@ -135,15 +135,45 @@ export const COASTAL_OUTDOORS=['village','road','estuary'] as const;
 export function isCoastalOutdoor(zone:Zone){
   return COASTAL_OUTDOORS.some(outdoor=>outdoor===zone);
 }
+export const GLASSWORKS_INTERIOR=['glassworks','annealing'] as const;
+export function isGlassworksInterior(zone:Zone){
+  return GLASSWORKS_INTERIOR.some(room=>room===zone);
+}
 export function coastalGateOpen(g:Game){return (g.campaign?.stage??0)>=ESTUARY_STAGE.trail;}
 
-/** Positions on both sides of an outdoor boundary share the same rendered coordinates. */
+// The wing's south wall abuts the west wall of the glassworks.
+const ANNEALING_OFFSET={
+  x:ANNEALING_DOOR.x-1-ANNEALING_RETURN.y,
+  y:ANNEALING_DOOR.y+ANNEALING_RETURN.x,
+};
 export function regionOffset(zone:Zone):Point{
   if(zone==='road')return ROAD_OFFSET;
   if(zone==='estuary')return ESTUARY_OFFSET;
+  if(zone==='annealing')return ANNEALING_OFFSET;
   return {x:0,y:0};
 }
+export function regionRotation(zone:Zone){return zone==='annealing'?-1:0;}
+function rotateRegionPoint(point:Point,quarterTurns:number):Point{
+  if(quarterTurns<0)return {x:point.y,y:-point.x};
+  if(quarterTurns>0)return {x:-point.y,y:point.x};
+  return point;
+}
+export function regionScenePoint(zone:Zone,point:Point):Point{
+  const rotated=rotateRegionPoint(point,regionRotation(zone)),offset=regionOffset(zone);
+  return {x:rotated.x+offset.x,y:rotated.y+offset.y};
+}
+function regionLocalPoint(zone:Zone,point:Point):Point{
+  const offset=regionOffset(zone);
+  return rotateRegionPoint({x:point.x-offset.x,y:point.y-offset.y},-regionRotation(zone));
+}
+export function rebaseRegionView(from:Zone,to:Zone,view:Point&{yaw:number}){
+  const position=regionLocalPoint(to,regionScenePoint(from,view));
+  return {...position,yaw:view.yaw+(regionRotation(from)-regionRotation(to))*Math.PI/2};
+}
 export function sharedOutdoors(a:Zone,b:Zone){return isCoastalOutdoor(a)&&isCoastalOutdoor(b);}
+export function sharedScene(a:Zone,b:Zone){
+  return sharedOutdoors(a,b)||isGlassworksInterior(a)&&isGlassworksInterior(b);
+}
 /** The visible door sits just inside the front edge of its doorstep cell. */
 export function entrancePoint(p:Entrance):Point{const[dx,dy]=DIRECTIONS[p.direction];return{x:p.x+dx*.45,y:p.y+dy*.45};}
 export function entranceAhead(g:Game,origin:Point=g.position){const door=nearbyEntrance(g,origin);return door?.direction===g.direction?door:undefined;}

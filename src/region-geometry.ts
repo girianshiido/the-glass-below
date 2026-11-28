@@ -1,7 +1,7 @@
-import {EXPEDITION_FIXTURES,FLOATING_WALKWAY,BELL_BARRIER} from './expedition-world.ts';
+import {EXPEDITION_FIXTURES,FLOATING_WALKWAY,BELL_BARRIER,ANNEALING_DOOR,SERVICE_DOOR} from './expedition-world.ts';
 import {isFloatingWalkway} from './expedition-state.ts';
 import {BELL_STEPS,LOCK_STAIRS,SLUICE_WHEEL,TIDE_GATE,COASTAL_GATE,COASTAL_SHORE_Y,COASTAL_BRIDGE_TILES,ROAD_TO_ESTUARY,ESTUARY_LINK} from './estuary-world.ts';
-import {REGION_WORLDS,regionWall,VILLAGE_DETAILS,trailCoverage,regionOffset} from './region-world.ts';
+import {REGION_WORLDS,regionWall,VILLAGE_DETAILS,trailCoverage,regionOffset,regionRotation} from './region-world.ts';
 import {DIRECTIONS} from './world.ts';
 import type {Zone} from './campaign.ts';
 export type Vec=[number,number,number];
@@ -31,6 +31,13 @@ export function regionGeometry(zone:Zone){const w=REGION_WORLDS[zone],groups={}a
   const ground=zone==='road'?path:zone==='village'?cobble:zone==='estuary'?(x>=21&&y>=9?wood:cobble):floor;if(zone!=='road'&&!(zone==='village'&&x===20&&y===8)&&!(zone==='estuary'&&(x===ESTUARY_LINK.x&&y===ESTUARY_LINK.y||isFloatingWalkway({x,y}))))quad(ground,[l,0,t],[r,0,t],[r,0,b],[l,0,b],[0,1,0]);
   if(!w.outdoor){quad(stone,[l,w.ceiling,b],[r,w.ceiling,b],[r,w.ceiling,t],[l,w.ceiling,t],[0,-1,0]);for(const[dx,dy]of [[0,-1],[0,1],[-1,0],[1,0]]){
    if(!regionWall(zone,x+dx,y+dy))continue;
+   const edgeDoor=w.passages.find(p=>{
+     if(p.exitDirection===undefined||p.x!==x||p.y!==y)return false;
+     const [outX,outY]=DIRECTIONS[p.exitDirection];
+     return dx===outX&&dy===outY;
+   });
+   if(edgeDoor)continue; // The paired room begins on the other side of this edge.
+
    // Glassworks machinery is freestanding; only the exterior boundary has walls.
    if(zone==='glassworks'&&x+dx>0&&y+dy>0&&x+dx<width-1&&y+dy<height-1)continue;
    if(dx===-1)quad(stone,[l,0,b],[l,0,t],[l,w.ceiling,t],[l,w.ceiling,b],[1,0,0],[0,0,1,w.ceiling/2.6]);if(dx===1)quad(stone,[r,0,t],[r,0,b],[r,w.ceiling,b],[r,w.ceiling,t],[-1,0,0],[0,0,1,w.ceiling/2.6]);if(dy===-1)quad(stone,[l,0,t],[r,0,t],[r,w.ceiling,t],[l,w.ceiling,t],[0,0,1],[0,0,1,w.ceiling/2.6]);if(dy===1)quad(stone,[r,0,b],[l,0,b],[l,w.ceiling,b],[r,w.ceiling,b],[0,0,-1],[0,0,1,w.ceiling/2.6]);
@@ -82,6 +89,18 @@ export function regionGeometry(zone:Zone){const w=REGION_WORLDS[zone],groups={}a
   const ex=26*CELL,ez=6*CELL;box(stone,ex,0,ez,8,7.4,15);box(roof,ex,7.4,ez,8.8,.45,16);for(const z of [-5,5]){box(metal,ex+1,7.7,ez+z,1.5,8,1.5);for(let k=0;k<3;k++)box(metal,ex+1,9+k*2,ez+z,1.7,.16,1.7);}box(wood,24*CELL+.12,0,ez,.1,3.2,2.3);for(const z of [-4,4])box(glass,24.43*CELL,3.9,ez+z,.05,2.3,2.1);
  }
  if(zone==='glassworks'){
+  for(const door of [ANNEALING_DOOR,SERVICE_DOOR]){
+    const x=(door.x-.5)*CELL,z=door.y*CELL;
+    const lintel=3.1;
+    for(const side of [-1,1]){
+      box(cutstone,x,0,z+side*1.18,.37,lintel,.24);
+      box(fieldstone,x,.02,z+side*1.19,.47,.22,.3);
+    }
+    box(cutstone,x,lintel,z,.43,.24,CELL);
+    box(stone,x,lintel+.24,z,.2,w.ceiling-lintel-.24,CELL);
+    box(fieldstone,x,.005,z,.37,.025,CELL);
+  }
+
   for(const[x,y,bw,bd]of [[3,4,4,4],[16,4,4,4],[3,12,4,3],[17,12,3,3]]){const cx=(x+(bw-1)/2)*CELL,cz=(y+(bd-1)/2)*CELL;box(stone,cx,0,cz,bw*CELL,1.1,bd*CELL);box(stone,cx,1.1,cz,bw*CELL-.6,2.8,bd*CELL-.6);cone(stone,cx,cz,3.9,bw*CELL*.5,1.5,12);box(metal,cx,4.3,cz,1.1,2.2,1.1);for(const side of [-1,1]){box(wood,cx,.35,cz+side*bd*CELL/2,2.9,2.5,.2);box(ember,cx,.58,cz+side*(bd*CELL/2+.13),2.4,1.8,.04);for(let k=-2;k<=2;k++)box(metal,cx+k*.45,.5,cz+side*(bd*CELL/2+.19),.08,2.1,.05);}}
   for(const[x,y]of [[9,5],[13,5],[9,12],[13,12]]){box(stone,x*CELL,0,y*CELL,1.8,.4,1.8);box(metal,x*CELL,.4,y*CELL,.62,6.1,.62);box(metal,x*CELL,5.9,y*CELL,1.3,.5,1.3);}
   for(const x of [4,9,14,19]){box(metal,x*CELL,5.9,9*CELL,.22,.25,18*CELL);for(const z of [0,18]){box(wood,x*CELL,2.4,z*CELL+(z===0?.04:-.04),3,3.2,.08);box(coolglass,x*CELL,2.6,z*CELL+(z===0?.1:-.1),2.7,2.85,.04);box(metal,x*CELL,2.6,z*CELL+(z===0?.15:-.15),.13,2.85,.06);}}
@@ -95,7 +114,7 @@ export function regionGeometry(zone:Zone){const w=REGION_WORLDS[zone],groups={}a
  if(zone==='annealing')annealingArchitecture(groups);
  if(zone==='warehouse')warehouseArchitecture(groups);
  // Physical lintels and stair treads distinguish exits from blank walls.
- for(const p of w.passages){if(p.id==='pine-gate'||p.id==='village-return'||p.id==='bell-shortcut'||p.id==='coastal-crossing'||p.id==='estuary-return')continue;const x=p.id==='crypt-return'?.28*CELL:p.x*CELL,z=p.y*CELL,stair=p.id.includes('stairs')||p.id==='crypt-return',alongX=p.id==='crypt-return'||p.id==='warehouse-walkway'||p.id==='lock-culvert'||p.id==='warehouse-culvert'||p.x===0||p.x===width-1;
+ for(const p of w.passages){if(p.exitDirection!==undefined||p.id==='pine-gate'||p.id==='village-return'||p.id==='bell-shortcut'||p.id==='coastal-crossing'||p.id==='estuary-return')continue;const x=p.id==='crypt-return'?.28*CELL:p.x*CELL,z=p.y*CELL,stair=p.id.includes('stairs')||p.id==='crypt-return',alongX=p.id==='crypt-return'||p.id==='warehouse-walkway'||p.id==='lock-culvert'||p.id==='warehouse-culvert'||p.x===0||p.x===width-1;
   for(const side of [-1,1])box(stone,x+(alongX?0:side*1.15),0,z+(alongX?side*1.15:0),alongX?.35:.25,3.15,alongX?.25:.35);box(stone,x,3.05,z,alongX?.35:2.6,.23,alongX?2.6:.35);
   if(stair){for(let k=0;k<7;k++)box(stone,x+(alongX?(k-3)*.29:0),.025+k*.075,z+(alongX?0:(k-3)*.29),alongX?.31:1.85,.08,alongX?1.85:.31);
    // Open handrails, with separated posts rather than opaque bronze slabs.
@@ -108,6 +127,16 @@ export function regionGeometry(zone:Zone){const w=REGION_WORLDS[zone],groups={}a
 const COASTAL_OPENING={halfWidth:1.07,spring:1.94,outerRadius:1.47,depth:.78};
 
 const coastalGateX=COASTAL_GATE.x*CELL,coastalGateZ=COASTAL_GATE.y*CELL;
+
+export function appendInScene(zone:Zone,vertices:number[],output:number[]){
+  const origin=regionOffset(zone),dx=origin.x*CELL,dz=origin.y*CELL;
+  const rotated=regionRotation(zone)!==0;
+  for(let i=0;i<vertices.length;i+=8){
+    const [x,y,z,nx,ny,nz,u,v]=vertices.slice(i,i+8);
+    if(rotated)output.push(z+dx,y,-x+dz,nz,ny,-nx,u,v);
+    else output.push(x+dx,y,z+dz,nx,ny,nz,u,v);
+  }
+}
 
 function coastalBridge({fieldstone,cutstone,cobble,metal,ember}:Record<Material,number[]>){
   const walkable=new Set(COASTAL_BRIDGE_TILES.map(({x,y})=>`${x},${y}`));

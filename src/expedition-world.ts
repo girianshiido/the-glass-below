@@ -8,7 +8,9 @@ export function roomMap(width:number,height:number,rooms:number[][],buildings:Bu
 }
 
 export const ANNEALING_DOOR={x:0,y:11};
-export const SERVICE_DOOR={x:22,y:3};
+export const SERVICE_DOOR={x:0,y:3};
+export const ANNEALING_RETURN={x:11,y:17};
+export const ANNEALING_SERVICE={x:19,y:17};
 export const FLOATING_WALKWAY={y:9,start:24,end:29};
 export const BELL_BARRIER={x:12,y:4};
 
@@ -17,12 +19,12 @@ export const ANNEALING:RegionWorld={
   map:roomMap(23,18,[
     [11,14,1,4],[9,11,5,4],[7,13,3,1],[3,10,5,5],
     [5,6,1,5],[3,3,5,4],[7,5,10,1],[10,1,3,4],
-    [16,3,4,5],[18,7,1,5],[15,11,5,4],[13,13,2,1],
+    [16,3,4,5],[18,7,1,5],[15,11,5,4],[13,13,2,1],[19,15,1,3],
   ]),
   buildings:[],residents:[],entrances:[],
   passages:[
-    {id:'annealing-return',x:11,y:17,to:'glassworks',spawn:{x:1,y:11},direction:0,label:'Return to the furnace hall'},
-    {id:'annealing-service',x:11,y:1,to:'glassworks',spawn:{x:21,y:3},direction:2,label:'Take the service passage'},
+    {id:'annealing-return',...ANNEALING_RETURN,exitDirection:1,to:'glassworks',spawn:ANNEALING_DOOR,direction:0,label:'Return to the furnace hall'},
+    {id:'annealing-service',...ANNEALING_SERVICE,exitDirection:1,to:'glassworks',spawn:SERVICE_DOOR,direction:0,label:'Take the service passage'},
   ],
   encounters:[
     {id:'annealing-archives',x:5,y:13,kind:'scavenger',name:'Ledger Guardian',strength:1.25,tactic:'shell'},

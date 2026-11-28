@@ -68,10 +68,15 @@ export function move(g:Game,relative:number){
   if(g.phase!=='explore')return false;
   const direction=(g.direction+relative+4)%4,[dx,dy]=DIRECTIONS[direction];
   const next={x:g.position.x+dx,y:g.position.y+dy};
+  const threshold=g.campaign&&regionOf(g).passages.find(p=>p.exitDirection===direction&&same(p,g.position));
+  if(threshold){
+    if(passageLocked(g,threshold)){g.message=passageHint(g,threshold);return false;}
+    return crossPassage(g,threshold);
+  }
   if(g.campaign?regionWall(g.campaign.zone,next.x,next.y):wall(next.x,next.y)){g.message='The way is blocked.';return false;}
   const obstacle=regionObstacle(g,next);
   if(obstacle){g.message=obstacle;return false;}
-  if(g.campaign){const p=regionOf(g).passages.find(p=>same(p,next));if(p){if(passageLocked(g,p)){g.message=passageHint(g,p);return false;}if(crossPassage(g,p))return true;}if(regionOf(g).residents.some(n=>same(n,next)&&!(n.id==='lys'&&g.campaign!.recruited))){g.message='Move forward to approach, then interact to speak.';return false;}}
+  if(g.campaign){const p=regionOf(g).passages.find(p=>p.exitDirection===undefined&&same(p,next));if(p){if(passageLocked(g,p)){g.message=passageHint(g,p);return false;}if(crossPassage(g,p))return true;}if(regionOf(g).residents.some(n=>same(n,next)&&!(n.id==='lys'&&g.campaign!.recruited))){g.message='Move forward to approach, then interact to speak.';return false;}}
   if((!g.campaign||g.campaign.zone==='crypts')&&same(next,GATE)&&!g.gateOpen){g.message=g.key?'The gate is locked. Interact to use the key.':'A copper key is needed.';return false;}
   const encounter=(g.campaign?regionOf(g).encounters:ENCOUNTERS).find(e=>encounterActive(g,e.id)&&same(e,next));
   if(encounter){g.direction=direction;beginBattle(g,encounter);return false;}
@@ -96,7 +101,7 @@ export function locationHint(g:Game){
 }
 export function interact(g:Game){
   if(g.phase!=='explore')return;
-  if(g.campaign){const p=nearbyPassage(g);if(p){if(p.id==='pine-gate'&&g.campaign.stage>=1&&!g.campaign.villageGateOpen){g.campaign.villageGateOpen=true;g.campaign.gateOpenedAt=g.playTime;g.message='The pine gate opens. Walk through to leave Greyhaven.';return;}if(passageLocked(g,p)){g.message=passageHint(g,p);return;}crossPassage(g);return;}if(g.campaign.zone!=='crypts'){g.message=locationHint(g);return;}}
+  if(g.campaign){const p=nearbyPassage(g);if(p){if(p.id==='pine-gate'&&g.campaign.stage>=1&&!g.campaign.villageGateOpen){g.campaign.villageGateOpen=true;g.campaign.gateOpenedAt=g.playTime;g.message='The pine gate opens. Walk through to leave Greyhaven.';return;}if(passageLocked(g,p)||p.exitDirection!==undefined&&!same(p,g.position)){g.message=passageHint(g,p);return;}crossPassage(g);return;}if(g.campaign.zone!=='crypts'){g.message=locationHint(g);return;}}
   if(same(g.position,CHEST)&&!g.chestOpen){g.chestOpen=true;g.key=true;g.gold+=30;g.message='Copper key found · +30 shards';return;}
   if(same(g.position,SHRINE)&&!g.shrineUsed){g.shrineUsed=true;for(const h of g.heroes){h.hp=h.maxHp;h.mp=h.maxMp;}g.message='The spring restores all HP and MP.';return;}
   if(!g.gateOpen&&Math.abs(g.position.x-GATE.x)+Math.abs(g.position.y-GATE.y)===1){if(g.key){g.gateOpen=true;reveal(g.seen,g.position,true);g.message='The gate opens.';}else g.message='You need the copper key.';return;}

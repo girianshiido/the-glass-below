@@ -33,7 +33,7 @@ The chapter has a complete quest route: clear the road, optionally report to Ela
 
 ![Inside the glassworks](docs/world-glassworks.jpg)
 
-The annealing wing opens off the west side of the glassworks. Recover the courier's ledger **or** light both burners to unlock the kiln stairs once Lys has joined. Doing both opens a service route back to the east side of the hall. Bring the ledger to Elara for a permanent party mana bonus.
+The annealing wing opens off the west side of the glassworks. Recover the courier's ledger **or** light both burners to unlock the kiln stairs once Lys has joined. Doing both opens a service route from the east burner to the north-west side of the hall. Both doorways connect to the glassworks as a continuous interior. Bring the ledger to Elara for a permanent party mana bonus.
 
 ## Chapter II — The Drowned Bell
 
