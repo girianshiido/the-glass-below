@@ -1,3 +1,4 @@
+import {EXPEDITION_FLAGS,isFloatingWalkway,lowWater} from './expedition-state.ts';
 import {regionWall,REGION_WORLDS,revealRegion} from './region-world.ts';
 import {CAMPAIGN_ENCOUNTERS,ROAD_ENCOUNTERS,refreshStats,xpNeeded,ESTUARY_STAGE,activeHero,CAMPAIGN_PATROL_IDS,CAMPAIGN_PATROLS,CAMPAIGN_PATROL_LIMIT} from './campaign.ts';
 import {createGame,PATROL_SITES,RESPAWN_DELAY} from './engine.ts';
@@ -17,10 +18,28 @@ export function deserialize(raw:string):Game|null{
       if(c.zone==='estuary'&&c.stage<ESTUARY_STAGE.trail||c.zone==='lockworks'&&c.stage<ESTUARY_STAGE.drained)return null;
       if(c.bellShortcut!==undefined&&typeof c.bellShortcut!=='boolean'||c.bellShortcut&&c.stage<ESTUARY_STAGE.mooring||c.stage>=ESTUARY_STAGE.alone&&!c.bellShortcut)return null;
       if(c.sluiceLoweredAt!==undefined&&(!Number.isFinite(c.sluiceLoweredAt)||c.sluiceLoweredAt<0||c.sluiceLoweredAt>s.playTime||c.stage<ESTUARY_STAGE.drained))return null;
-      g.campaign=structuredClone(c);refreshStats(g);
+      if(c.zone==='warehouse'&&c.stage<ESTUARY_STAGE.sluice||c.zone==='annealing'&&c.stage<2)return null;
+      if(c.expedition!==undefined){
+        const progress=c.expedition;
+        if(!progress||typeof progress!=='object'||Array.isArray(progress))return null;
+        if(EXPEDITION_FLAGS.some(key=>progress[key]!==undefined&&typeof progress[key]!=='boolean'))return null;
+        if(progress.waterLow!==undefined&&typeof progress.waterLow!=='boolean')return null;
+        const at=progress.tideChangedAt;
+        if(at!==undefined&&(!Number.isFinite(at)||at<0||at>s.playTime))return null;
+        if(progress.courierReported&&!progress.ledger||progress.lanternReturned&&!progress.lantern||progress.relayAligned&&(!progress.freight||!progress.signal))return null;
+      }
+      g.campaign=structuredClone(c);
+      if(c.expedition===undefined){
+        g.campaign!.expedition={
+          priorCryptAccess:c.zone==='crypts'||c.visited.includes('crypts'),
+          priorKeeperAccess:c.stage===ESTUARY_STAGE.drained,
+        };
+      }
+      refreshStats(g);
     }
     let position={...s.position},direction=s.direction;
     if(g.campaign){const c=g.campaign;if(c.worldVersion!==undefined&&c.worldVersion!==1&&c.worldVersion!==2&&c.worldVersion!==3)return null;if(c.worldVersion!==2&&c.worldVersion!==3){if(c.zone!=='crypts'||regionWall(c.zone,position.x,position.y)){position={...REGION_WORLDS[c.zone].spawn};direction=REGION_WORLDS[c.zone].direction;}c.worldVersion=3;c.villageGateOpen=c.stage>=1;c.gateOpenedAt=undefined;c.worldSeen={};}else{if(c.worldVersion===2){if(c.zone==='village'){position={...REGION_WORLDS.village.spawn};direction=3;}else if(regionWall(c.zone,position.x,position.y)){const tiles=REGION_WORLDS[c.zone].map.flatMap((row,y)=>[...row].flatMap((v,x)=>v==='.'?[{x,y}]:[]));tiles.sort((a,b)=>Math.hypot(a.x-position.x,a.y-position.y)-Math.hypot(b.x-position.x,b.y-position.y));position=tiles[0];}c.worldVersion=3;c.worldSeen={...c.worldSeen,village:[],road:[]};}if(regionWall(c.zone,position.x,position.y)||typeof c.villageGateOpen!=='boolean'||c.gateOpenedAt!==undefined&&(!Number.isFinite(c.gateOpenedAt)||c.gateOpenedAt<0))return null;}
+      if(c.zone==='estuary'&&isFloatingWalkway(position)&&lowWater(g))position={x:23,y:9};
       if(c.worldSeen!==undefined){if(!c.worldSeen||typeof c.worldSeen!=='object'||Array.isArray(c.worldSeen))return null;for(const[zone,cells]of Object.entries(c.worldSeen)){if(!(zone in REGION_WORLDS)||!Array.isArray(cells)||cells.length>1500||cells.some(v=>typeof v!=='string'||!/^\d+,\d+$/.test(v)))return null;}}
     }else if(wall(position.x,position.y))return null;
     for(let i=0;i<2;i++){const h=s.heroes[i];if(!h||!Number.isFinite(h.hp)||!Number.isFinite(h.mp)||h.hp<0||h.hp>g.heroes[i].maxHp||h.mp<0||h.mp>g.heroes[i].maxMp)return null;g.heroes[i].hp=h.hp;g.heroes[i].mp=h.mp;}

@@ -1,3 +1,5 @@
+import {EXPEDITION_FIXTURES,FLOATING_WALKWAY,BELL_BARRIER} from './expedition-world.ts';
+import {isFloatingWalkway} from './expedition-state.ts';
 import {BELL_STEPS,LOCK_STAIRS,SLUICE_WHEEL,TIDE_GATE} from './estuary-world.ts';
 import {REGION_WORLDS,regionWall,VILLAGE_DETAILS,trailCoverage} from './region-world.ts';
 import type {Zone} from './campaign.ts';
@@ -20,7 +22,7 @@ export function regionGeometry(zone:Zone){const w=REGION_WORLDS[zone],groups={}a
  if(zone==='village'){quad(grass,[-90,-.07,-90],[150,-.07,-90],[150,-.07,150],[-90,-.07,150],[0,1,0],[0,0,30,30]);for(let k=0;k<26;k++){const a=k*Math.PI*2/26,r=150+10*Math.sin(k*9);cone(mountain,20*CELL+Math.cos(a)*r,8*CELL+Math.sin(a)*r,-4,23+9*Math.sin(k*4),25+12*Math.sin(k*7),6);}}
  for(let y=0;y<height;y++)for(let x=0;x<width;x++){
   if(regionWall(zone,x,y)&&!(zone==='village'&&VILLAGE_DETAILS.some(([px,py])=>px===x&&py===y)))continue;const l=(x-.5)*CELL,r=(x+.5)*CELL,t=(y-.5)*CELL,b=(y+.5)*CELL;
-  const ground=zone==='road'?path:zone==='village'?cobble:zone==='estuary'?(x>=21&&y>=9?wood:cobble):floor;if(zone!=='road'&&!(zone==='village'&&x===20&&y===8))quad(ground,[l,0,t],[r,0,t],[r,0,b],[l,0,b],[0,1,0]);
+  const ground=zone==='road'?path:zone==='village'?cobble:zone==='estuary'?(x>=21&&y>=9?wood:cobble):floor;if(zone!=='road'&&!(zone==='village'&&x===20&&y===8)&&!(zone==='estuary'&&isFloatingWalkway({x,y})))quad(ground,[l,0,t],[r,0,t],[r,0,b],[l,0,b],[0,1,0]);
   if(!w.outdoor){quad(stone,[l,w.ceiling,b],[r,w.ceiling,b],[r,w.ceiling,t],[l,w.ceiling,t],[0,-1,0]);for(const[dx,dy]of [[0,-1],[0,1],[-1,0],[1,0]]){
    if(!regionWall(zone,x+dx,y+dy))continue;
    // Glassworks machinery is freestanding; only the exterior boundary has walls.
@@ -80,8 +82,10 @@ export function regionGeometry(zone:Zone){const w=REGION_WORLDS[zone],groups={}a
  }
  if(zone==='estuary')estuaryArchitecture(groups);
  if(zone==='lockworks')lockworksArchitecture(groups);
+ if(zone==='annealing')annealingArchitecture(groups);
+ if(zone==='warehouse')warehouseArchitecture(groups);
  // Physical lintels and stair treads distinguish exits from blank walls.
- for(const p of w.passages){if(p.id==='pine-gate'||p.id==='village-return'||p.id==='bell-shortcut')continue;const x=p.id==='crypt-return'?.28*CELL:p.x*CELL,z=p.y*CELL,stair=p.id.includes('stairs')||p.id==='crypt-return',alongX=p.id==='crypt-return'||p.x===0||p.x===width-1;
+ for(const p of w.passages){if(p.id==='pine-gate'||p.id==='village-return'||p.id==='bell-shortcut')continue;const x=p.id==='crypt-return'?.28*CELL:p.x*CELL,z=p.y*CELL,stair=p.id.includes('stairs')||p.id==='crypt-return',alongX=p.id==='crypt-return'||p.id==='warehouse-walkway'||p.id==='lock-culvert'||p.id==='warehouse-culvert'||p.x===0||p.x===width-1;
   for(const side of [-1,1])box(stone,x+(alongX?0:side*1.15),0,z+(alongX?side*1.15:0),alongX?.35:.25,3.15,alongX?.25:.35);box(stone,x,3.05,z,alongX?.35:2.6,.23,alongX?2.6:.35);
   if(stair){for(let k=0;k<7;k++)box(stone,x+(alongX?(k-3)*.29:0),.025+k*.075,z+(alongX?0:(k-3)*.29),alongX?.31:1.85,.08,alongX?1.85:.31);
    // Open handrails, with separated posts rather than opaque bronze slabs.
@@ -103,7 +107,7 @@ function estuaryArchitecture(groups:Record<Material,number[]>){
   }
   const terrain=REGION_WORLDS.estuary.map;
   for(let y=0;y<terrain.length;y++)for(let x=0;x<terrain[y].length;x++){
-    if(terrain[y][x]!=='.')continue;
+    if(terrain[y][x]!=='.'||isFloatingWalkway({x,y}))continue;
     if(x<=8||x>=21||y<=5){
       box(x>=21&&y>=9?wood:fieldstone,x*CELL,-1,y*CELL,CELL,.99,CELL);
       if((x<=8&&y===12||x===21&&y>=8||x===19&&y<=5)&&(x+y)%2!==0){
@@ -122,6 +126,17 @@ function estuaryArchitecture(groups:Record<Material,number[]>){
   for(const [x,z] of [[12.7,9],[17.9,10.8],[19.7,7.3],[21.4,11.3],[21.8,9.7]]){
     cylinder(wood,x*CELL,z*CELL,0,.32,.69,12);
     for(const ringY of [.11,.51])ring(metal,x*CELL,z*CELL,ringY,.34,.32,.08);
+  }
+  // The bonded warehouse is visible across the basin from the quay.
+  const warehouseX=(FLOATING_WALKWAY.end+1.45)*CELL,warehouseZ=FLOATING_WALKWAY.y*CELL;
+  box(fieldstone,warehouseX,-.95,warehouseZ,5.4,1,9.4);
+  box(wood,warehouseX,0,warehouseZ,5.2,4.5,8.8);
+  box(roof,warehouseX,4.48,warehouseZ,5.6,.3,9.3);
+  box(cutstone,warehouseX-2.64,0,warehouseZ,1.2,2.64,2.3);
+  box(wood,warehouseX-3.31,.14,warehouseZ,.14,2.2,1.74);
+  for(const side of [-1,1]){
+    box(metal,warehouseX-2.69,2.2,warehouseZ+side*2.7,.11,1.03,1.25);
+    box(ember,warehouseX-2.75,2.33,warehouseZ+side*2.7,.1,.41,.48);
   }
   // Bell tower with a visible bronze bell recessed below its roof.
   const tx=BELL_STEPS.x*CELL,tz=(BELL_STEPS.y-1.19)*CELL;
@@ -161,8 +176,8 @@ function estuaryArchitecture(groups:Record<Material,number[]>){
   }
 }
 
-function lockworksArchitecture({metal,cutstone,wood,coolglass}:Record<Material,number[]>){
-  for(const [x,z] of [[2,9],[8,6],[12,5],[12,3]]){
+function lockworksArchitecture({metal,cutstone,wood,coolglass,water}:Record<Material,number[]>){
+  for(const [x,z] of [[2,9],[8,6],[12,5],[12,3],[16,8],[22,8],[23,13],[25,15]]){
     for(const side of [-1,1]){
       box(cutstone,(x+side*.43)*CELL,0,z*CELL,.19,3.6,.29);
       box(metal,(x+side*.4)*CELL,1.25,z*CELL,.1,.24,.22);
@@ -170,8 +185,69 @@ function lockworksArchitecture({metal,cutstone,wood,coolglass}:Record<Material,n
     }
     box(cutstone,x*CELL,3.27,z*CELL,CELL,.22,.35);
   }
+  const gateX=BELL_BARRIER.x*CELL,gateZ=BELL_BARRIER.y*CELL+.95;
+  for(const side of [-1,1])box(cutstone,gateX+side*1.15,0,gateZ,.34,3.31,.41);
+  box(cutstone,gateX,3.13,gateZ,2.65,.25,.46);
+  const relay=EXPEDITION_FIXTURES.signal;
+  box(cutstone,relay.x*CELL,0,relay.y*CELL-.84,1.16,.9,.56);
+  box(metal,relay.x*CELL,.9,relay.y*CELL-.84,.96,.4,.51);
+  for(let i=-1;i<=1;i++)box(metal,relay.x*CELL+i*.23,1.22,relay.y*CELL-.68,.08,.22,.12);
+  // Shallow brine along the walls gives the sump a visible waterline.
+  for(const [x,y] of [[15,11],[18,13],[24,9],[24,11],[21,15],[25,16]]){
+    const wx=x*CELL,wz=y*CELL;
+    quad(water,[wx-1.1,.025,wz-1.15],[wx+1.1,.025,wz-1.15],[wx+1.1,.025,wz+1.15],[wx-1.1,.025,wz+1.15],[0,1,0]);
+  }
   for(const z of [1.54,3.68]){
     box(wood,13.9*CELL,0,z*CELL,1.1,.54,.64);
     for(const dx of [-.43,.43])box(metal,13.9*CELL+dx,.04,z*CELL,.11,.54,.66);
+  }
+}
+
+
+function archiveTable(groups:Record<Material,number[]>,x:number,z:number){
+  const {wood,cutstone,metal}=groups;
+  box(wood,x,.72,z,1.18,.12,.56);
+  for(const side of [-1,1])box(wood,x+side*.49,0,z,.13,.74,.47);
+  box(cutstone,x,.84,z,.53,.043,.36);
+  for(const side of [-1,1])box(metal,x+side*.16,.88,z+.1,.028,.015,.16);
+}
+
+function annealingArchitecture(groups:Record<Material,number[]>){
+  const {brick,metal,wood,cutstone,coolglass}=groups;
+  for(const burner of [EXPEDITION_FIXTURES.westBurner,EXPEDITION_FIXTURES.eastBurner]){
+    const x=burner.x*CELL,z=burner.y*CELL-.84;
+    box(brick,x,0,z,1.52,1.22,.58);
+    box(cutstone,x,1.2,z,1.64,.18,.71);
+    box(metal,x,1.39,z,.28,3.31,.34);
+    box(metal,x,.41,z+.31,1.12,.58,.08);
+    for(const side of [-1,1])box(brick,x+side*.56,.23,z+.39,.23,.88,.47);
+  }
+  const ledger=EXPEDITION_FIXTURES.ledger;
+  archiveTable(groups,ledger.x*CELL,ledger.y*CELL-.82);
+  for(const [x,y] of [[3,12],[3,13],[7,11],[10,4],[12,4],[18,4],[15,12]]){
+    const wx=x*CELL-.94,wz=y*CELL;
+    box(wood,wx,0,wz,.55,1.38,1.18);
+    for(const h of [.45,.94,1.36])box(coolglass,wx+.29,h,wz,.16,.28,.78);
+  }
+  for(let x=7;x<=16;x++){
+    box(metal,x*CELL,3.55,5*CELL,CELL,.28,.32);
+    box(brick,x*CELL,3.87,5*CELL,.26,.8,.3);
+  }
+}
+
+function warehouseArchitecture(groups:Record<Material,number[]>){
+  const {wood,metal,fieldstone}=groups;
+  const freight=EXPEDITION_FIXTURES.freight;
+  archiveTable(groups,freight.x*CELL,freight.y*CELL-.8);
+  for(const [x,y] of [[2,10],[8,11],[4,14],[3,2],[7,4],[14,3],[17,5],[16,13],[12,11],[14,7]]){
+    const wx=x*CELL-.87,wz=y*CELL;
+    box(wood,wx,0,wz,.84,.84,1.16);
+    box(wood,wx,.85,wz-.12,.71,.65,.65);
+    for(const side of [-1,1])box(metal,wx+.43,.09,wz+side*.43,.06,.62,.11);
+  }
+  for(const [x,y] of [[3,3],[7,3],[3,11],[7,11],[14,3],[17,3],[12,12],[15,12]]){
+    box(wood,x*CELL-.9,0,y*CELL+.88,.21,5.5,.21);
+    box(fieldstone,x*CELL-.9,0,y*CELL+.88,.41,.42,.41);
+    box(wood,x*CELL,4.87,y*CELL+.88,CELL,.18,.3);
   }
 }

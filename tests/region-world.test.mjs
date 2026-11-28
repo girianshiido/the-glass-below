@@ -1,16 +1,19 @@
+import {EXPEDITION_FIXTURES,ANNEALING_DOOR,BELL_BARRIER} from '../src/expedition-world.ts';
+import {cryptAccess,keeperAccess,lowWater} from '../src/expedition-state.ts';
 import {MOORING,SLUICE_WHEEL,TIDE_GATE} from '../src/estuary-world.ts';
 import {CRYPT_TORCHES} from '../src/scene-lights.ts';
 import {forestTrees,CELL} from '../src/region-geometry.ts';
 import {test} from 'node:test';import assert from 'node:assert/strict';
 import {createGame,move,interact,turn,useSkill,continueAfterBattle,partySkills} from '../src/engine.ts';
 import {setupCampaign,campaignAction,ROAD_ENCOUNTERS,companion,travel} from '../src/campaign.ts';
-import {REGION_WORLDS,regionOf,regionWall,nearbyResident,regionSight,regionOffset,sharedOutdoors,entranceAhead,nearbyEntrance,entrancePoint,residentApproach,INTERACTION_REACH,RESIDENT_STOP_DISTANCE,trailCoverage,estuaryFixture} from '../src/region-world.ts';
+import {REGION_WORLDS,regionOf,regionWall,nearbyResident,regionSight,regionOffset,sharedOutdoors,entranceAhead,nearbyEntrance,entrancePoint,residentApproach,INTERACTION_REACH,RESIDENT_STOP_DISTANCE,trailCoverage,nearbyFixture,regionObstacle} from '../src/region-world.ts';
 import {DIRECTIONS,CHEST,GATE} from '../src/world.ts';
 import {serialize,deserialize} from '../src/save.ts';
 const same=(a,b)=>a.x===b.x&&a.y===b.y;
+const point=({x,y})=>({x,y});
 function route(zone,start,goal,blocked=()=>false){const q=[{...start,path:[]}],seen=new Set([`${start.x},${start.y}`]);for(const p of q){if(same(p,goal))return p.path;for(let d=0;d<4;d++){const[dx,dy]=DIRECTIONS[d],n={x:p.x+dx,y:p.y+dy},key=`${n.x},${n.y}`;if(seen.has(key)||regionWall(zone,n.x,n.y)||blocked(n))continue;seen.add(key);q.push({...n,path:[...p.path,d]});}}}
 function win(g){g.battle.enemies[0].hp=1;g.heroes[0].mp=g.heroes[0].maxMp;g.battle.cooldowns.fracture=0;g.battle.globalCooldown=0;useSkill(g,'fracture');assert.equal(g.phase,'victory');continueAfterBattle(g);}
-function go(g,goal){for(let i=0;i<300&&!same(g.position,goal);i++){if(g.phase==='combat')win(g);const r=regionOf(g),path=route(r.zone,g.position,goal,n=>r.residents.some(p=>same(p,n)&&!(p.id==='lys'&&g.campaign.recruited))||!g.gateOpen&&r.zone==='crypts'&&same(n,GATE)||r.passages.some(p=>same(p,n)));assert(path?.length,`No route to ${JSON.stringify(goal)} in ${r.zone}`);while(g.direction!==path[0]&&g.phase==='explore')turn(g,1);if(g.phase==='combat'){win(g);continue;}move(g,0);if(g.phase==='combat')win(g);}assert.deepEqual(g.position,goal);}
+function go(g,goal){for(let i=0;i<300&&!same(g.position,goal);i++){if(g.phase==='combat')win(g);const r=regionOf(g),path=route(r.zone,g.position,goal,n=>r.residents.some(p=>same(p,n)&&!(p.id==='lys'&&g.campaign.recruited))||!g.gateOpen&&r.zone==='crypts'&&same(n,GATE)||!!regionObstacle(g,n)||r.passages.some(p=>same(p,n)));assert(path?.length,`No route to ${JSON.stringify(goal)} in ${r.zone}`);while(g.direction!==path[0]&&g.phase==='explore')turn(g,1);if(g.phase==='combat'){win(g);continue;}move(g,0);if(g.phase==='combat')win(g);}assert.deepEqual(g.position,goal);}
 test('Each region supports broad spaces, visible distant scenery and collision-safe passages',()=>{
  for(const w of Object.values(REGION_WORLDS)){assert(w.map.every(row=>row.length===w.map[0].length));assert(!regionWall(w.zone,w.spawn.x,w.spawn.y));for(const p of w.passages){assert(!regionWall(w.zone,p.x,p.y));assert(!regionWall(p.to,p.spawn.x,p.spawn.y));}}
  assert(regionSight('village',{x:10,y:12},{x:10,y:9}));assert(regionSight('glassworks',{x:11,y:16},{x:11,y:8}));
@@ -24,7 +27,13 @@ test('The entire village-road-glassworks-crypt route uses physical gates and sta
  for(const e of ROAD_ENCOUNTERS){go(g,{x:e.x-1,y:e.y});while(g.direction!==0&&g.phase==='explore')turn(g,1);if(g.phase==='combat')win(g);}assert.equal(g.campaign.stage,2);
  go(g,{x:23,y:6});interact(g);assert.equal(g.campaign.zone,'glassworks');assert.deepEqual(g.position,{x:11,y:16});
  go(g,{x:11,y:8});while(g.direction!==3&&g.phase==='explore')turn(g,1);if(g.phase==='combat')win(g);assert.equal(g.campaign.stage,4);
- go(g,{x:18,y:2});g.direction=1;assert.equal(nearbyResident(g,residentApproach(g)).id,'lys');assert(campaignAction(g,'recruit'));go(g,{x:19,y:1});interact(g);assert.equal(g.campaign.zone,'crypts');
+ go(g,{x:18,y:2});g.direction=1;assert.equal(nearbyResident(g,residentApproach(g)).id,'lys');assert(campaignAction(g,'recruit'));go(g,{x:19,y:1});interact(g);assert.equal(g.campaign.zone,'glassworks');
+ go(g,{x:ANNEALING_DOOR.x+1,y:ANNEALING_DOOR.y});g.direction=2;assert(move(g,0));assert.equal(g.campaign.zone,'annealing');
+ go(g,point(EXPEDITION_FIXTURES.ledger));assert.equal(nearbyFixture(g).id,'ledger');assert(campaignAction(g,'ledger'));assert(cryptAccess(g));
+ go(g,{x:11,y:2});g.direction=3;assert(!move(g,0),'Ledger alone does not open the service shortcut');
+ for(const key of ['westBurner','eastBurner']){go(g,point(EXPEDITION_FIXTURES[key]));assert(campaignAction(g,key));}
+ go(g,{x:11,y:2});g.direction=3;assert(move(g,0));assert.equal(g.campaign.zone,'glassworks');
+ go(g,{x:19,y:1});interact(g);assert.equal(g.campaign.zone,'crypts');
  go(g,{x:1,y:2});interact(g);assert.equal(g.campaign.zone,'glassworks');go(g,{x:11,y:17});interact(g);assert.equal(g.campaign.zone,'road');go(g,{x:1,y:10});interact(g);assert.equal(g.campaign.zone,'village');assert(deserialize(serialize(g)));
 });
 test('Version-one chapter saves retain progression, gear, health and story when moved into the 3D world',()=>{
@@ -77,16 +86,23 @@ test('An existing chapter-one save can reach Saltreach, drain the lock, meet the
  assert(move(g,0));
  assert.equal(entranceAhead(g).id,'neris');
  assert(campaignAction(g,'meet-neris'));
+ go(g,{x:28,y:9});g.direction=0;assert(move(g,0));assert.equal(g.campaign.zone,'warehouse');
+ go(g,point(EXPEDITION_FIXTURES.freight));assert(campaignAction(g,'freight'));
+ go(g,{x:3,y:14});g.direction=1;assert(move(g,0));assert.equal(g.campaign.zone,'estuary');
  go(g,{x:21,y:6});interact(g);
  assert.equal(g.campaign.zone,'estuary','Water prevents use of the stairhead');
  go(g,SLUICE_WHEEL);
- assert.equal(estuaryFixture(g).id,'drain-lock');
+ assert.equal(nearbyFixture(g).id,'drain-lock');
  assert(campaignAction(g,'drain-lock'));
  go(g,{x:21,y:6});interact(g);
  assert.equal(g.campaign.zone,'lockworks');
  assert.equal(companion(g),'lys');
  assert.deepEqual(partySkills(g),['fracture','frost','heal']);
-
+ assert(!keeperAccess(g));
+ go(g,{x:12,y:5});g.direction=3;
+ assert(!move(g,0));assert(regionObstacle(g,BELL_BARRIER));
+ go(g,point(EXPEDITION_FIXTURES.signal));assert(campaignAction(g,'signal'));assert(keeperAccess(g));
+ go(g,point(EXPEDITION_FIXTURES.lantern));assert(campaignAction(g,'lantern'));
  go(g,{x:13,y:2});
  if(!g.cleared.has('bell-keeper')){g.direction=1;turn(g,1);if(g.phase==='combat')win(g);}
  assert(g.cleared.has('bell-keeper'));
@@ -96,7 +112,7 @@ test('An existing chapter-one save can reach Saltreach, drain the lock, meet the
  assert.equal(g.campaign.bellShortcut,true);
  assert.equal(companion(g),'lys');
  go(g,MOORING);
- assert.equal(estuaryFixture(g).id,'part-ways');
+ assert.equal(nearbyFixture(g).id,'part-ways');
  assert(campaignAction(g,'part-ways'));
  g=resume(g);
  assert.equal(companion(g),undefined);
@@ -106,10 +122,57 @@ test('An existing chapter-one save can reach Saltreach, drain the lock, meet the
  assert(g.cleared.has('tide-stray'));
  assert(campaignAction(g,'secure-tide'));
  go(g,{x:11,y:9});
+ const shards=g.gold;
+ assert(campaignAction(g,'return-lantern'));
+ assert.equal(g.gold,shards+30);
+ assert(!campaignAction(g,'return-lantern'));
  assert(campaignAction(g,'sail-with-neris'));
  g=resume(g);
  assert.equal(companion(g),'neris');
  assert.equal(g.heroes[1].name,'Neris');
  assert.deepEqual(partySkills(g),['fracture','breakwater','hook']);
  assert.equal(g.campaign.weapon,'tempered');
+});
+
+test('The low-water route can reach both clues and return, and the floating route reopens after raising the sluice',()=>{
+ const g=setupCampaign(createGame());
+ Object.assign(g.campaign,{stage:9,recruited:true,zone:'estuary'});
+ g.position={...SLUICE_WHEEL};
+ assert(campaignAction(g,'drain-lock'));
+ assert(lowWater(g));
+ go(g,{x:23,y:9});g.direction=0;
+ assert(!move(g,0),'The floating walkway has dropped out of reach');
+ go(g,{x:21,y:6});interact(g);
+ assert.equal(g.campaign.zone,'lockworks');
+ go(g,point(EXPEDITION_FIXTURES.signal));assert(campaignAction(g,'signal'));
+ assert(!keeperAccess(g));
+ go(g,{x:24,y:6});g.direction=0;assert(move(g,0));
+ assert.equal(g.campaign.zone,'warehouse');
+ assert(g.campaign.expedition.culvert);
+ go(g,point(EXPEDITION_FIXTURES.freight));assert(campaignAction(g,'freight'));
+ assert(!keeperAccess(g),'The relay still needs to be set in the lock');
+ go(g,{x:3,y:14});g.direction=1;assert(!move(g,0));
+ go(g,{x:16,y:8});g.direction=0;assert(move(g,0));
+ assert.equal(g.campaign.zone,'lockworks');
+ go(g,point(EXPEDITION_FIXTURES.signal));assert(campaignAction(g,'signal'));assert(keeperAccess(g));
+ go(g,{x:2,y:11});g.direction=1;assert(move(g,0));
+ go(g,SLUICE_WHEEL);assert(campaignAction(g,'raise-lock'));assert(!lowWater(g));
+ const restored=deserialize(serialize(g));assert(restored);assert(!lowWater(restored));
+ go(restored,{x:28,y:9});restored.direction=0;assert(move(restored,0));
+ assert.equal(restored.campaign.zone,'warehouse');
+});
+
+test('A saved 2.2 expedition already below the Bell bridge or the kiln remains playable',()=>{
+ const g=setupCampaign(createGame());
+ for(const [zone,stage,position,canEnter] of [
+  ['lockworks',10,{x:13,y:2},keeperAccess],
+  ['crypts',5,{x:3,y:1},cryptAccess],
+ ]){
+   Object.assign(g.campaign,{zone,stage,recruited:true,expedition:undefined});
+   g.position=position;g.gold=81;
+   const restored=deserialize(serialize(g));
+   assert(restored);
+   assert.deepEqual(restored.position,position);assert.equal(restored.gold,81);
+   assert(canEnter(restored));
+ }
 });

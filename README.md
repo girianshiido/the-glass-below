@@ -4,7 +4,7 @@ An original English-language RPG for phones, tablets and desktop browsers. Stric
 
 [Play The Glass Below](https://girianshiido.github.io/the-glass-below/)
 
-## Chapter I — The Borrowed Light · 1.0
+## Chapter I — The Borrowed Light
 
 Kael reaches Greyhaven with a letter he does not remember receiving. The village is losing its memories; the abandoned glassworks may be keeping them.
 
@@ -33,11 +33,15 @@ The chapter has a complete quest route: clear the road, optionally report to Ela
 
 ![Inside the glassworks](docs/world-glassworks.jpg)
 
+The annealing wing opens off the west side of the glassworks. Recover the courier's ledger **or** light both burners to unlock the kiln stairs once Lys has joined. Doing both opens a service route back to the east side of the hall. Bring the ledger to Elara for a permanent party mana bonus.
+
 ## Chapter II — The Drowned Bell
 
-After returning the memory prism, speak to Elder Elara. The coastal arch on Old Pine Road leads to Saltreach, a hamlet linked by causeways, wharves and a bell tower. Meet Neris inside her boathouse, drain the old lock and follow the bell beneath the quay. Unbolt the tower door from inside to open the return route. The chapter continues from existing saves with the same equipment and progression.
+After returning the memory prism, speak to Elder Elara. The coastal arch on Old Pine Road leads to Saltreach, a hamlet linked by causeways, wharves and a bell tower. Meet Neris inside her boathouse. At high water the floating walkway leads to the bonded warehouse, where the freight register records the bell code. At low water the stairhead opens the Drowned Lock, where the code sets the relay and releases the bridge. The culvert can be unbolted from below to connect the two areas at low water. Find and return Neris’s signal lantern for a reward. Unbolt the tower door from inside to open the return route after facing the Keeper. Existing saves retain their equipment, discoveries and story progress.
 
 Lys stays with Kael through the Drowned Lock. The opening of Chapter III includes a solo expedition along the lower quay and Neris joining the party. Her Breakwater halves one incoming strike. Hook Feint deals damage and increases the next Fracture's damage by 50%. The new estuary score is rendered from MIDI with FluidSynth and MuseScore General HQ, in OGG and AAC.
+
+Armoured enemies take reduced damage until Fracture breaks their shell. Some wraiths alternate ordinary attacks and a clearly marked riposte stance. Interrupting a riposte inflicts immediate damage on the caster.
 
 ## Returning patrols
 

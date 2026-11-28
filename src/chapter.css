@@ -73,3 +73,6 @@
   .region-map.expanded .region-node{max-width:48%;padding:6px}
   .region-map.expanded .region-node b{font-size:14px}
 }
+
+.enemy-card.riposte{border-color:#da9cba}
+.enemy-card.riposte .intent-meter i{background:#da9cba}

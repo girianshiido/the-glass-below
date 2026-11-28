@@ -1,3 +1,5 @@
+import {EXPEDITION_FIXTURES,FLOATING_WALKWAY,BELL_BARRIER,SERVICE_DOOR} from './expedition-world.ts';
+import {keeperAccess,lowWater,isFloatingWalkway,burnersLit} from './expedition-state.ts';
 import {ESTUARY_STAGE,BELL_STEPS,LOCK_STAIRS,ROAD_TO_ESTUARY,SLUICE_WHEEL,TIDE_GATE} from './estuary-world.ts';
 import {CRYPT_TORCHES,TORCH_HEIGHT} from './scene-lights.ts';
 import {regionGeometry,COLORS,box as regionBox,quad as regionQuad} from './region-geometry.ts';
@@ -199,7 +201,11 @@ export class DungeonRenderer {
     const gl=this.gl,w=Math.round(this.canvas.clientWidth*Math.min(devicePixelRatio||1,1.6)),h=Math.round(this.canvas.clientHeight*Math.min(devicePixelRatio||1,1.6));if(this.canvas.width!==w||this.canvas.height!==h){this.canvas.width=w;this.canvas.height=h;}if(!w||!h)return;
     const region=regionOf(g),offset=regionOffset(region.zone),battle=g.battle,clock=g.phase==='combat'?battle!.time:time,eye:Vec=[(camera.x+offset.x)*CELL,CAMERA_HEIGHT,(camera.y+offset.y)*CELL],outdoor=region.outdoor,greyhavenExterior=region.zone==='village'||region.zone==='road';
     const fog:Vec=region.zone==='estuary'?[.44,.55,.57]:outdoor?[.38,.49,.54]:region.zone==='glassworks'?[.08,.14,.17]:[.025,.065,.08];gl.clearColor(...fog,1);gl.viewport(0,0,w,h);gl.depthMask(true);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.useProgram(this.program);
-    const lights:Vec[]=region.zone==='crypts'?CRYPT_TORCHES.map(p=>[p.x*CELL,TORCH_HEIGHT,p.y*CELL]):region.zone==='glassworks'?[[4.5*CELL,1.5,7.6*CELL],[17.5*CELL,1.5,7.6*CELL],[4.5*CELL,1.5,11.4*CELL],[18*CELL,1.5,11.4*CELL]]:region.zone==='lockworks'?[[2.4*CELL,1.5,9*CELL],[8.4*CELL,1.5,6*CELL],[12.4*CELL,1.5,5*CELL],[12.4*CELL,1.5,3*CELL]]:[];
+    const lights:Vec[]=region.zone==='crypts'?CRYPT_TORCHES.map(p=>[p.x*CELL,TORCH_HEIGHT,p.y*CELL]):region.zone==='glassworks'?[[4.5*CELL,1.5,7.6*CELL],[17.5*CELL,1.5,7.6*CELL],[4.5*CELL,1.5,11.4*CELL],[18*CELL,1.5,11.4*CELL]]:region.zone==='lockworks'?[[2.4*CELL,1.5,9*CELL],[8.4*CELL,1.5,6*CELL],[12.4*CELL,1.5,5*CELL],[12.4*CELL,1.5,3*CELL],[16.4*CELL,1.5,8*CELL],[21.4*CELL,1.5,10*CELL],[23.4*CELL,1.5,14*CELL]]:
+      region.zone==='warehouse'?[[3.2*CELL,2.55,11*CELL],[6.2*CELL,2.15,7*CELL],[7*CELL,2.2,3*CELL],[16.6*CELL,2.45,3*CELL],[16.35*CELL,2.45,8*CELL],[12*CELL,2.5,12*CELL]]:
+      region.zone==='annealing'?[[11*CELL,1.65,13*CELL],[3.15*CELL,1.7,11*CELL],[14*CELL,1.7,5*CELL],
+        ...(g.campaign!.expedition?.westBurner?[[3*CELL,1.21,4*CELL]] as Vec[]:[]),
+        ...(g.campaign!.expedition?.eastBurner?[[19*CELL,1.21,11*CELL]] as Vec[]:[])]:[];
     const encounter=battle?encounterDefinition(battle.encounter):undefined;
     const advance=battle?Math.max(0,...battle.enemies.map(e=>{const age=battle.time-e.strikeAt;return age>=0&&age<.3?Math.sin(age/.3*Math.PI)*.22:0;})):0;
     const close=encounter&&battle?battlePosition(g.position,encounter,battle.time):encounter;
@@ -236,6 +242,7 @@ export class DungeonRenderer {
       if(this.residents&&c.stage===ESTUARY_STAGE.mooring&&c.bellShortcut)
         this.transient(this.billboard(22.4*CELL,11.4*CELL,.82,1.9,camera.yaw,[.75,0,1,1],-.13),this.residents,[1,1,1],1);
     }
+    this.drawExpeditionFixtures(g);
     // Opaque world geometry writes depth first; alpha cutout characters then occlude correctly.
     const sprites:{x:number;y:number;kind?:keyof typeof CREATURES;enemy?:Enemy;frame?:number;scale:number}[]=[];
     for(const visible of greyhavenExterior?[REGION_WORLDS.village,REGION_WORLDS.road]:[region]){const origin=regionOffset(visible.zone);for(const e of visible.encounters){const active=battle?.encounter===e.id;if(!encounterActive(g,e.id)||g.phase==='victory'&&active)continue;const place=active&&battle?battlePosition(g.position,e,battle.time):e;sprites.push({...e,x:place.x+origin.x,y:place.y+origin.y,enemy:active?visibleEnemy(battle!):undefined,scale:active?framing?.scale??1:1});}for(const n of visible.residents)if(!(n.id==='lys'&&g.campaign!.recruited))sprites.push({...n,x:n.x+origin.x,y:n.y+origin.y,scale:1});}
@@ -247,8 +254,8 @@ export class DungeonRenderer {
   }
 
   private drawEstuaryControls(g:Game){
-    const c=g.campaign!,props:number[]=[];
-    for(const [point,operated] of [[SLUICE_WHEEL,c.stage>=ESTUARY_STAGE.drained],[TIDE_GATE,c.stage>=ESTUARY_STAGE.ferrymaster]] as const){
+    const c=g.campaign!,props:number[]=[],low=lowWater(g);
+    for(const [point,operated] of [[SLUICE_WHEEL,low],[TIDE_GATE,c.stage>=ESTUARY_STAGE.ferrymaster]] as const){
       const x=point.x*CELL,z=point.y*CELL-.67,angle=operated?.55:0;
       for(let i=0;i<20;i++){
         const a=i*Math.PI/10+angle;
@@ -278,12 +285,61 @@ export class DungeonRenderer {
       this.transient(hull,this.materials.get('wood')??this.white,[.84,.68,.51]);
     }
 
-    const fill=c.stage<ESTUARY_STAGE.drained?1:Math.max(0,1-(g.playTime-(c.sluiceLoweredAt??-3))/1.8);
+    const blend=Math.min(1,Math.max(0,(g.playTime-(c.expedition?.tideChangedAt??c.sluiceLoweredAt??-3))/1.8));
+    const fill=low?1-blend:blend;
+    const deck:number[]=[],zWalk=FLOATING_WALKWAY.y*CELL,height=-1.08*(1-fill);
+    const start=(FLOATING_WALKWAY.start-.5)*CELL,end=(FLOATING_WALKWAY.end+.5)*CELL;
+    for(let x=start+.16;x<end;x+=.32)regionBox(deck,x,height-.14,zWalk,.301,.14,2.46);
+    for(const side of [-1,1]){
+      regionBox(deck,(start+end)/2,height-.51,zWalk+side*.86,end-start,.43,.34);
+      for(let x=start+.16;x<end;x+=1.3)regionBox(deck,x,height,zWalk+side*1.15,.13,.75,.13);
+      regionBox(deck,(start+end)/2,height+.66,zWalk+side*1.15,end-start,.105,.12);
+    }
+    this.transient(deck,this.materials.get('wood')??this.white,[.82,.77,.69]);
     if(fill>0){
       const water:number[]=[],wx=LOCK_STAIRS.x*CELL,wz=LOCK_STAIRS.y*CELL,h=.17+fill*.69;
       regionQuad(water,[wx-1.10,h,wz-1.23],[wx+1.10,h,wz-1.23],[wx+1.10,h,wz+1.19],[wx-1.10,h,wz+1.19],[0,1,0]);
       this.transient(water,this.white,[.17,.39,.43],3.25,.91);
     }
+  }
+
+  private drawExpeditionFixtures(g:Game){
+    const c=g.campaign!,p=c.expedition;
+    const iron:number[]=[],glow:number[]=[];
+    const barred=(x:number,z:number,alongX:boolean)=>{
+      for(let bar=-4;bar<=4;bar++){
+        const offset=bar*.25;
+        regionBox(iron,x+(alongX?0:offset),0,z+(alongX?offset:0),.095,3.04,.13);
+      }
+      regionBox(iron,x,1.22,z,alongX?.17:2.3,.11,alongX?2.3:.17);
+    };
+    if(c.zone==='lockworks'){
+      if(!keeperAccess(g)){
+        const x=BELL_BARRIER.x*CELL,z=BELL_BARRIER.y*CELL+.95;
+        barred(x,z,false);
+      }
+      const relay=EXPEDITION_FIXTURES.signal;
+      regionBox(glow,relay.x*CELL,1.29,relay.y*CELL-.57,.48,.12,.08);
+      if(!p?.lantern){
+        const tag=EXPEDITION_FIXTURES.lantern,x=tag.x*CELL,z=tag.y*CELL-.57;
+        regionBox(iron,x,0,z,.35,.13,.29);
+        regionBox(glow,x,.13,z,.23,.26,.22);
+      }
+    }
+    if(c.zone==='warehouse'&&!p?.culvert)barred(17*CELL,8*CELL,true);
+    if(!(p?.ledger&&burnersLit(g))){
+      if(c.zone==='annealing')barred(11*CELL,1*CELL,false);
+      if(c.zone==='glassworks')barred(SERVICE_DOOR.x*CELL,SERVICE_DOOR.y*CELL,true);
+    }
+    if(c.zone==='annealing'){
+      for(const key of ['westBurner','eastBurner'] as const){
+        const burner=EXPEDITION_FIXTURES[key],x=burner.x*CELL,z=burner.y*CELL;
+        if(p?.[key])regionBox(glow,x,.51,z-.477,1,.41,.055);
+        else regionBox(iron,x,.7,z-.45,.15,.19,.16);
+      }
+    }
+    if(iron.length)this.transient(iron,this.white,[.28,.26,.22]);
+    if(glow.length)this.transient(glow,this.white,c.zone==='annealing'?[1,.51,.14]:[.31,.72,.63],2);
   }
 
 }
@@ -297,7 +353,12 @@ export function drawMap(canvas:HTMLCanvasElement,g:Game,full=false){
     if(!seen.has(`${x},${y}`))continue;const px=ox+x*size,py=oy+y*size;
     ctx.fillStyle=map[y][x]==='#'?'#3f5355':'#172e31';ctx.fillRect(px+1,py+1,size-2,size-2);
     if(map[y][x]==='#')continue;
+    if(region?.zone==='estuary'&&isFloatingWalkway({x,y})&&lowWater(g)){
+      ctx.fillStyle='#1d4957';ctx.fillRect(px+1,py+1,size-2,size-2);continue;
+    }
     const p={x,y};let color='';if(region?.passages.some(q=>same(p,q)))color='#80d6c7';if(region?.residents.some(q=>same(p,q))||region?.entrances.some(q=>same(p,q)))color='#e2c476';if(region?.zone==='estuary'&&[SLUICE_WHEEL,TIDE_GATE].some(q=>same(p,q)))color='#86c2bb';if((!region||region.zone==='crypts')&&same(p,CHEST))color=g.chestOpen?'#70634c':'#d9b574';if((!region||region.zone==='crypts')&&same(p,SHRINE))color='#80d6c7';if((!region||region.zone==='crypts')&&same(p,GATE)&&!g.gateOpen)color='#c8885a';if((!region||region.zone==='crypts')&&same(p,EXIT))color='#c8ebe4';
+    if(region&&Object.values(EXPEDITION_FIXTURES).some(f=>f.zone===region.zone&&same(f,p)))color='#e2c476';
+    if(region?.zone==='lockworks'&&same(p,BELL_BARRIER)&&!keeperAccess(g))color='#c8885a';
     if((region?.encounters??ENCOUNTERS).some(e=>same(e,p)&&encounterActive(g,e.id)))color='#c27569';
     if(color){ctx.fillStyle=color;ctx.beginPath();ctx.arc(px+size/2,py+size/2,size*.18,0,Math.PI*2);ctx.fill();}
   }

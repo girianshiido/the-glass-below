@@ -1,3 +1,5 @@
+import {ANNEALING,WAREHOUSE,ANNEALING_DOOR,SERVICE_DOOR,BELL_BARRIER,EXPEDITION_FIXTURES} from './expedition-world.ts';
+import {burnersLit,cryptAccess,keeperAccess,lowWater,isFloatingWalkway} from './expedition-state.ts';
 import {ESTUARY_STAGE,ESTUARY,LOCKWORKS,ROAD_TO_ESTUARY,SLUICE_WHEEL,MOORING,TIDE_GATE} from './estuary-world.ts';
 import type {Zone} from './campaign.ts';
 import type {Game} from './engine.ts';
@@ -21,7 +23,7 @@ rect(road,10,8,3,3,'.');rect(road,18,5,3,3,'.');road[10][0]='.';road[6][24]='.';
 // Broad furnace and workshop halls, with a traversable opening between their columns.
 rect(works,3,4,4,4);rect(works,16,4,4,4);rect(works,3,12,4,3);rect(works,17,12,3,3);
 for(const [x,y]of [[9,5],[13,5],[9,12],[13,12]])works[y][x]='#';
-works[17][11]='.';works[18][11]='.';works[0][19]='.';
+works[17][11]='.';works[18][11]='.';works[0][19]='.';works[ANNEALING_DOOR.y][ANNEALING_DOOR.x]='.';works[SERVICE_DOOR.y][SERVICE_DOOR.x]='.';
 // Preserve quest landmarks and the old encounter IDs while opening genuinely large crypt rooms.
 const crypt=OLD_MAP.map(r=>r.split(''));
 rect(crypt,11,1,7,4,'.');rect(crypt,3,5,5,3,'.');rect(crypt,11,10,7,2,'.');
@@ -31,12 +33,19 @@ const finish=(m:string[][])=>m.map(r=>r.join(''));
 export const REGION_WORLDS:Record<Zone,RegionWorld>={
  village:{zone:'village',map:finish(village),spawn:{x:10,y:11},direction:3,buildings,residents:[{id:'elara',name:'Elder Elara',frame:0,x:9,y:6}],entrances:[{id:'inn',x:4,y:8,direction:3},{id:'shop',x:16,y:11,direction:3}],passages:[{id:'pine-gate',x:20,y:8,to:'road',spawn:{x:0,y:10},direction:0,label:'Old Pine Road'}],encounters:[],ceiling:0,outdoor:true},
  road:{zone:'road',map:finish(road),spawn:{x:1,y:10},direction:0,buildings:[],residents:[],entrances:[],passages:[{id:'village-return',x:0,y:10,to:'village',spawn:{x:20,y:8},direction:2,label:'Greyhaven'},{id:'glassworks-door',x:24,y:6,to:'glassworks',spawn:{x:11,y:16},direction:3,label:'Enter the glassworks'},{id:'estuary-arch',...ROAD_TO_ESTUARY,to:'estuary',spawn:{x:1,y:12},direction:0,label:'Follow the causeway to Saltreach'}],encounters:[{id:'road-shards',x:6,y:10,kind:'scavenger'},{id:'road-hollow',x:13,y:8,kind:'scavenger'},{id:'road-lantern',x:20,y:6,kind:'wraith'},{id:'pine-root',x:9,y:10,kind:'scavenger'},{id:'pine-bend',x:17,y:6,kind:'scavenger'}],ceiling:0,outdoor:true},
- glassworks:{zone:'glassworks',map:finish(works),spawn:{x:11,y:16},direction:3,buildings:[],residents:[{id:'lys',name:'Lys',frame:3,x:18,y:3}],entrances:[],passages:[{id:'works-return',x:11,y:18,to:'road',spawn:{x:23,y:6},direction:2,label:'Old Pine Road'},{id:'crypt-stairs',x:19,y:0,to:'crypts',spawn:{x:1,y:1},direction:0,label:'Descend into the crypts'}],encounters:[{id:'furnace',kind:'wraith',x:11,y:7},{id:'kiln-crawler',kind:'scavenger',x:7,y:10},{id:'loading-bay',kind:'wraith',x:20,y:10}],ceiling:6.5,outdoor:false},
+ glassworks:{zone:'glassworks',map:finish(works),spawn:{x:11,y:16},direction:3,buildings:[],residents:[{id:'lys',name:'Lys',frame:3,x:18,y:3}],entrances:[],passages:[{id:'works-return',x:11,y:18,to:'road',spawn:{x:23,y:6},direction:2,label:'Old Pine Road'},{id:'annealing-door',...ANNEALING_DOOR,to:'annealing',spawn:{x:11,y:16},direction:3,label:'Enter the annealing wing'},{id:'annealing-shortcut',...SERVICE_DOOR,to:'annealing',spawn:{x:11,y:2},direction:1,label:'Enter the annealing wing by the service passage'},{id:'crypt-stairs',x:19,y:0,to:'crypts',spawn:{x:1,y:1},direction:0,label:'Descend into the crypts'}],encounters:[{id:'furnace',kind:'wraith',x:11,y:7},{id:'kiln-crawler',kind:'scavenger',x:7,y:10},{id:'loading-bay',kind:'wraith',x:20,y:10}],ceiling:6.5,outdoor:false},
  crypts:{zone:'crypts',map:finish(crypt),spawn:{x:1,y:1},direction:0,buildings:[],residents:[],entrances:[],passages:[{id:'crypt-return',x:1,y:1,to:'glassworks',spawn:{x:19,y:1},direction:1,label:'Climb to the glassworks'},{id:'warden-stairs',x:17,y:13,to:'glassworks',spawn:{x:19,y:1},direction:1,label:'Climb to the glassworks'}],encounters:OLD_ENCOUNTERS.map(e=>({...e})),ceiling:4.3,outdoor:false},
- estuary:ESTUARY, lockworks:LOCKWORKS,
+ estuary:ESTUARY, lockworks:LOCKWORKS, annealing:ANNEALING, warehouse:WAREHOUSE,
 };
 export function regionOf(g:Game){return REGION_WORLDS[g.campaign?.zone??'crypts'];}
 export function regionWall(zone:Zone,x:number,y:number){return REGION_WORLDS[zone].map[y]?.[x]!=='.';}
+export function regionObstacle(g:Game,point:Point):string|undefined {
+  const zone=g.campaign?.zone;
+  if(zone==='estuary'&&isFloatingWalkway(point)&&lowWater(g))return 'The floating walkway sits below the quay. Raise the water at the sluice.';
+  if(zone==='lockworks'&&point.x===BELL_BARRIER.x&&point.y===BELL_BARRIER.y&&!keeperAccess(g))
+    return 'The bell bridge is held by the relay. Read the freight register and trace the signal.';
+}
+
 export function regionSight(zone:Zone,a:Point,b:Point,gateOpen=true){const n=Math.max(1,Math.ceil(Math.hypot(b.x-a.x,b.y-a.y)*12));for(let i=1;i<=n;i++){const x=Math.round(a.x+(b.x-a.x)*i/n),y=Math.round(a.y+(b.y-a.y)*i/n);if(regionWall(zone,x,y)||zone==='crypts'&&!gateOpen&&x===17&&y===9)return false;}return true;}
 export function regionEncounter(id:string){for(const w of Object.values(REGION_WORLDS)){const e=w.encounters.find(e=>e.id===id);if(e)return e;}return undefined;}
 const CELL_METRES=2.6;
@@ -54,35 +63,58 @@ export function passageLocked(g:Game,p:Passage){
   if(!c)return false;
   if(p.id==='pine-gate')return c.stage<1||!c.villageGateOpen||c.gateOpenedAt!==undefined&&g.playTime-c.gateOpenedAt<.9;
   if(p.id==='glassworks-door')return c.stage<2;
-  if(p.id==='crypt-stairs')return !c.recruited;
+  if(p.id==='crypt-stairs')return !cryptAccess(g);
+  if(p.id==='annealing-service'||p.id==='annealing-shortcut')return !(c.expedition?.ledger&&burnersLit(g));
+  if(p.id==='warehouse-walkway')return c.stage<ESTUARY_STAGE.sluice||lowWater(g);
+  if(p.id==='warehouse-return')return lowWater(g);
+  if(p.id==='warehouse-culvert')return !c.expedition?.culvert||!lowWater(g);
   if(p.id==='estuary-arch')return c.stage<ESTUARY_STAGE.trail;
-  if(p.id==='lock-stairs')return c.stage<ESTUARY_STAGE.drained;
+  if(p.id==='lock-stairs')return !lowWater(g);
   if(p.id==='bell-stairs')return c.stage<ESTUARY_STAGE.mooring;
-  if(p.id==='bell-shortcut')return !c.bellShortcut;
+  if(p.id==='bell-shortcut')return !c.bellShortcut||!lowWater(g);
   return false;
 }
 
+function cShortcutMessage(g:Game){
+  return g.campaign?.bellShortcut?'The lock is flooded. Lower the water at the sluice.':'The tower door opens from the other side.';
+}
 export function passageHint(g:Game,p:Passage){
   if(!passageLocked(g,p))return p.label;
   const stage=g.campaign!.stage;
   const locked:Record<string,string>={
     'pine-gate':stage<1?'Speak to Elder Elara before leaving Greyhaven.':g.campaign!.villageGateOpen?'The pine gate is opening…':'Open the pine gate',
     'glassworks-door':'Clear the three threats on the road first.',
-    'crypt-stairs':'Find Lys before descending.',
+    'crypt-stairs':g.campaign!.recruited?'Search the annealing wing for the ledger, or relight both burners.':'Find Lys before descending.',
+    'annealing-service':'The service passage needs both draft and the courier’s release stamp.',
+    'annealing-shortcut':'The service passage opens with both burners lit and the ledger recovered.',
+    'warehouse-walkway':stage<ESTUARY_STAGE.sluice?'Ask the ferrymaster about the bonded warehouse.':'Raise the sluice to float the walkway.',
+    'warehouse-return':'Use the culvert, or raise the walkway from Saltreach.',
+    'warehouse-culvert':lowWater(g)?'The culvert bolts open from below.':'Lower the water before entering the culvert.',
     'estuary-arch':'The coastal arch is locked.',
     'lock-stairs':'Water covers the lower stairs.',
     'bell-stairs':'The Keeper is still guarding the tower stairs.',
-    'bell-shortcut':'The tower door opens from the other side.',
+    'bell-shortcut':cShortcutMessage(g),
   };
   return locked[p.id]??p.label;
 }
 
-export function estuaryFixture(g:Game,origin:Point=g.position){
+export function nearbyFixture(g:Game,origin:Point=g.position){
   const c=g.campaign;
-  if(c?.zone!=='estuary'||g.phase!=='explore')return;
+  if(!c||g.phase!=='explore')return;
   if(Math.hypot(origin.x-g.position.x,origin.y-g.position.y)*CELL_METRES>INTERACTION_REACH)return;
   const {x,y}=g.position;
-  if(x===SLUICE_WHEEL.x&&y===SLUICE_WHEEL.y&&c.stage<ESTUARY_STAGE.drained)return {id:'drain-lock',label:'Turn the sluice wheel'};
+  const p=c.expedition;
+  for(const [action,fixture] of Object.entries(EXPEDITION_FIXTURES)){
+    const id=action as keyof typeof EXPEDITION_FIXTURES;
+    if(fixture.zone===c.zone&&fixture.x===x&&fixture.y===y){
+      // Records can still be read after the first discovery.
+      if((id==='westBurner'||id==='eastBurner'||id==='lantern')&&p?.[id])return;
+      return {id,label:fixture.label};
+    }
+  }
+  if(c.zone!=='estuary')return;
+  if(x===SLUICE_WHEEL.x&&y===SLUICE_WHEEL.y)
+    return lowWater(g)?{id:'raise-lock',label:'Raise the water'}:{id:'drain-lock',label:'Lower the water'};
   if(x===MOORING.x&&y===MOORING.y&&c.stage===ESTUARY_STAGE.mooring&&c.bellShortcut)return {id:'part-ways',label:'Speak to Lys at the mooring'};
   if(x===TIDE_GATE.x&&y===TIDE_GATE.y&&c.stage===ESTUARY_STAGE.alone)return {id:'secure-tide',label:'Close the tide gate'};
 }
