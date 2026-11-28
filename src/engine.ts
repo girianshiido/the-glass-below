@@ -1,3 +1,4 @@
+import {COASTAL_GATE} from './estuary-world.ts';
 import {regionOf,regionWall,regionObstacle,regionSight,nearbyPassage,passageLocked,passageHint,regionEncounter,revealRegion,roadThreat,encounterPresent} from './region-world.ts';
 import {activeHero,campaignVictory,updateCampaignPatrols,CAMPAIGN_ENCOUNTERS,crossPassage,companion,PATROL_DELAY} from './campaign.ts';
 import type {Campaign} from './campaign.ts';
@@ -81,7 +82,13 @@ export function move(g:Game,relative:number){
 }
 export function turn(g:Game,delta:number){if(g.phase!=='explore')return;g.direction=(g.direction+delta+4)%4;if(g.campaign)revealRegion(g);else reveal(g.seen,g.position,g.gateOpen);g.message=locationHint(g);const e=roadThreat(g)??encounterAhead(g);if(e){faceThreat(g,e);beginBattle(g,e);}}
 export function locationHint(g:Game){
-  if(g.campaign){const p=nearbyPassage(g);if(p)return passageHint(g,p);if(g.campaign.zone!=='crypts')return'';}
+  if(g.campaign){
+    const p=nearbyPassage(g);
+    if(p)return passageHint(g,p);
+    if(g.campaign.zone==='road'&&Math.abs(g.position.x-COASTAL_GATE.x)+Math.abs(g.position.y-COASTAL_GATE.y)===1)
+      return regionObstacle(g,COASTAL_GATE)??'';
+    if(g.campaign.zone!=='crypts')return '';
+  }
   if(same(g.position,CHEST)&&!g.chestOpen)return'Interact to open the chest.';
   if(same(g.position,SHRINE)&&!g.shrineUsed)return'Interact to restore your party at the spring.';
   if(!g.gateOpen&&Math.abs(g.position.x-GATE.x)+Math.abs(g.position.y-GATE.y)===1)return g.key?'Interact to unlock the gate.':'The gate is locked.';
@@ -89,7 +96,7 @@ export function locationHint(g:Game){
 }
 export function interact(g:Game){
   if(g.phase!=='explore')return;
-  if(g.campaign){const p=nearbyPassage(g);if(p){if(p.id==='pine-gate'&&g.campaign.stage>=1&&!g.campaign.villageGateOpen){g.campaign.villageGateOpen=true;g.campaign.gateOpenedAt=g.playTime;g.message='The pine gate opens. Walk through to leave Greyhaven.';return;}if(passageLocked(g,p)){g.message=passageHint(g,p);return;}crossPassage(g);return;}if(g.campaign.zone!=='crypts')return;}
+  if(g.campaign){const p=nearbyPassage(g);if(p){if(p.id==='pine-gate'&&g.campaign.stage>=1&&!g.campaign.villageGateOpen){g.campaign.villageGateOpen=true;g.campaign.gateOpenedAt=g.playTime;g.message='The pine gate opens. Walk through to leave Greyhaven.';return;}if(passageLocked(g,p)){g.message=passageHint(g,p);return;}crossPassage(g);return;}if(g.campaign.zone!=='crypts'){g.message=locationHint(g);return;}}
   if(same(g.position,CHEST)&&!g.chestOpen){g.chestOpen=true;g.key=true;g.gold+=30;g.message='Copper key found · +30 shards';return;}
   if(same(g.position,SHRINE)&&!g.shrineUsed){g.shrineUsed=true;for(const h of g.heroes){h.hp=h.maxHp;h.mp=h.maxMp;}g.message='The spring restores all HP and MP.';return;}
   if(!g.gateOpen&&Math.abs(g.position.x-GATE.x)+Math.abs(g.position.y-GATE.y)===1){if(g.key){g.gateOpen=true;reveal(g.seen,g.position,true);g.message='The gate opens.';}else g.message='You need the copper key.';return;}

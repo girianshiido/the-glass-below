@@ -4,7 +4,7 @@ import {ESTUARY_STAGE,BELL_STEPS,LOCK_STAIRS,SLUICE_WHEEL,TIDE_GATE} from './est
 import {CRYPT_TORCHES,TORCH_HEIGHT} from './scene-lights.ts';
 import {regionGeometry,coastalGateLeaves,COLORS,box as regionBox,quad as regionQuad} from './region-geometry.ts';
 import type {Material} from './region-geometry.ts';
-import {regionOf,REGION_WORLDS,regionOffset,trailCoverage} from './region-world.ts';
+import {regionOf,REGION_WORLDS,regionOffset,trailCoverage,isCoastalOutdoor,COASTAL_OUTDOORS,coastalGateOpen} from './region-world.ts';
 import type {Zone} from './campaign.ts';
 import {makeStone,makeFlame} from './stone-art.ts';
 import {MAP,WIDTH,HEIGHT,wall,ENCOUNTERS,CHEST,SHRINE,GATE,EXIT,same} from './world.ts';
@@ -112,8 +112,8 @@ export class DungeonRenderer {
     }
     this.ornament=this.mesh(ornament);this.walls=this.mesh(walls);this.floor=this.mesh(floor);this.ceiling=this.mesh(ceiling);this.dynamic=this.mesh([]);
     const shared={}as Record<Material,number[]>;for(const m of Object.keys(COLORS)as Material[])shared[m]=[];
-    const meshes=(groups:Record<Material,number[]>)=>Object.entries(groups).filter(([,v])=>v.length).sort(([a],[b])=>(a==='water'?2:a==='shadow'?1:0)-(b==='water'?2:b==='shadow'?1:0)).map(([material,v])=>({material:material as Material,mesh:this.mesh(v)}));
-    for(const zone of Object.keys(REGION_WORLDS)as Zone[]){const groups=regionGeometry(zone);if(zone==='village'||zone==='road'){const offset=regionOffset(zone);for(const material of Object.keys(groups)as Material[]){const v=groups[material],out=shared[material];for(let i=0;i<v.length;i+=8)out.push(v[i]+offset.x*CELL,v[i+1],v[i+2]+offset.y*CELL,...v.slice(i+3,i+8));}}else this.regions.set(zone,meshes(groups));}this.outdoorMeshes=meshes(shared);
+    const meshes=(groups:Record<Material,number[]>)=>Object.entries(groups).filter(([,v])=>v.length).sort(([a],[b])=>(a==='water'||a==='sea'?2:a==='shadow'?1:0)-(b==='water'||b==='sea'?2:b==='shadow'?1:0)).map(([material,v])=>({material:material as Material,mesh:this.mesh(v)}));
+    for(const zone of Object.keys(REGION_WORLDS)as Zone[]){const groups=regionGeometry(zone);if(isCoastalOutdoor(zone)){const offset=regionOffset(zone);for(const material of Object.keys(groups)as Material[]){const v=groups[material],out=shared[material];for(let i=0;i<v.length;i+=8)out.push(v[i]+offset.x*CELL,v[i+1],v[i+2]+offset.y*CELL,...v.slice(i+3,i+8));}}else this.regions.set(zone,meshes(groups));}this.outdoorMeshes=meshes(shared);
     const roadOrigin=regionOffset('road');
     const gateMesh=(open:boolean)=>this.mesh(coastalGateLeaves(roadOrigin.x*CELL,roadOrigin.y*CELL,open));
     this.coastalGates={open:gateMesh(true),closed:gateMesh(false)};
@@ -203,8 +203,8 @@ export class DungeonRenderer {
   }
   private renderRegion(g:Game,camera:Camera,time:number){
     const gl=this.gl,w=Math.round(this.canvas.clientWidth*Math.min(devicePixelRatio||1,1.6)),h=Math.round(this.canvas.clientHeight*Math.min(devicePixelRatio||1,1.6));if(this.canvas.width!==w||this.canvas.height!==h){this.canvas.width=w;this.canvas.height=h;}if(!w||!h)return;
-    const region=regionOf(g),offset=regionOffset(region.zone),battle=g.battle,clock=g.phase==='combat'?battle!.time:time,eye:Vec=[(camera.x+offset.x)*CELL,CAMERA_HEIGHT,(camera.y+offset.y)*CELL],outdoor=region.outdoor,greyhavenExterior=region.zone==='village'||region.zone==='road';
-    const fog:Vec=region.zone==='estuary'?[.44,.55,.57]:outdoor?[.38,.49,.54]:region.zone==='glassworks'?[.08,.14,.17]:[.025,.065,.08];gl.clearColor(...fog,1);gl.viewport(0,0,w,h);gl.depthMask(true);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.useProgram(this.program);
+    const region=regionOf(g),offset=regionOffset(region.zone),battle=g.battle,clock=g.phase==='combat'?battle!.time:time,eye:Vec=[(camera.x+offset.x)*CELL,CAMERA_HEIGHT,(camera.y+offset.y)*CELL],outdoor=region.outdoor,coastalExterior=isCoastalOutdoor(region.zone);
+    const fog:Vec=outdoor?[.38,.49,.54]:region.zone==='glassworks'?[.08,.14,.17]:[.025,.065,.08];gl.clearColor(...fog,1);gl.viewport(0,0,w,h);gl.depthMask(true);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.useProgram(this.program);
     const lights:Vec[]=region.zone==='crypts'?CRYPT_TORCHES.map(p=>[p.x*CELL,TORCH_HEIGHT,p.y*CELL]):region.zone==='glassworks'?[[4.5*CELL,1.5,7.6*CELL],[17.5*CELL,1.5,7.6*CELL],[4.5*CELL,1.5,11.4*CELL],[18*CELL,1.5,11.4*CELL]]:region.zone==='lockworks'?[[2.4*CELL,1.5,9*CELL],[8.4*CELL,1.5,6*CELL],[12.4*CELL,1.5,5*CELL],[12.4*CELL,1.5,3*CELL],[16.4*CELL,1.5,8*CELL],[21.4*CELL,1.5,10*CELL],[23.4*CELL,1.5,14*CELL]]:
       region.zone==='warehouse'?[[3.2*CELL,2.55,11*CELL],[6.2*CELL,2.15,7*CELL],[7*CELL,2.2,3*CELL],[16.6*CELL,2.45,3*CELL],[16.35*CELL,2.45,8*CELL],[12*CELL,2.5,12*CELL]]:
       region.zone==='annealing'?[[11*CELL,1.65,13*CELL],[3.15*CELL,1.7,11*CELL],[14*CELL,1.7,5*CELL],
@@ -218,13 +218,20 @@ export class DungeonRenderer {
     gl.uniformMatrix4fv(this.uniforms.uProjection,false,projection(w/h,framing?.shiftY??0));gl.uniformMatrix4fv(this.uniforms.uView,false,view(eye,camera.yaw));gl.uniform3fv(this.uniforms.uEye,eye);gl.uniform3fv(this.uniforms['uTorches[0]'],lights.length?lights.flat():[0,0,0]);gl.uniform1f(this.uniforms.uTorchCount,lights.length);gl.uniform3fv(this.uniforms.uAmbient,outdoor?[.8,.86,.9]:region.zone==='crypts'?[.13,.18,.2]:[.3,.36,.38]);gl.uniform1f(this.uniforms.uHeadlamp,0);gl.uniform1f(this.uniforms.uTime,clock);gl.uniform1f(this.uniforms.uOutside,outdoor?1:0);gl.uniform3fv(this.uniforms.uFogColor,fog);gl.uniform1f(this.uniforms.uFogDensity,outdoor?.000065:.00024);
     if(outdoor){const skybox:number[]=[],cx=20*CELL,cz=8*CELL,r=145;regionQuad(skybox,[cx-r,-30,cz-r],[cx+r,-30,cz-r],[cx+r,100,cz-r],[cx-r,100,cz-r],[0,0,1]);regionQuad(skybox,[cx+r,-30,cz+r],[cx-r,-30,cz+r],[cx-r,100,cz+r],[cx+r,100,cz+r],[0,0,-1]);regionQuad(skybox,[cx-r,-30,cz+r],[cx-r,-30,cz-r],[cx-r,100,cz-r],[cx-r,100,cz+r],[1,0,0]);regionQuad(skybox,[cx+r,-30,cz-r],[cx+r,-30,cz+r],[cx+r,100,cz+r],[cx+r,100,cz-r],[-1,0,0]);regionQuad(skybox,[cx-r,100,cz-r],[cx+r,100,cz-r],[cx+r,100,cz+r],[cx-r,100,cz+r],[0,-1,0],[0,1,1,1]);gl.depthMask(false);gl.uniform1f(this.uniforms.uFogDensity,0);this.transient(skybox,this.sky,[1,1,1],2);gl.uniform1f(this.uniforms.uFogDensity,.000065);gl.depthMask(true);}
     if(outdoor){gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.trailMask);gl.uniform1i(this.uniforms.uTrailMask,1);gl.activeTexture(gl.TEXTURE2);gl.bindTexture(gl.TEXTURE_2D,this.materials.get('grass')!);gl.uniform1i(this.uniforms.uGrass,2);gl.activeTexture(gl.TEXTURE0);}
-    for(const {material,mesh}of (greyhavenExterior?this.outdoorMeshes:this.regions.get(region.zone)!)){const tex=this.materials.get(material)??(material==='stone'?this.wallTexture:material==='floor'?this.floorTexture:this.white);if(material==='shadow'||material==='water')gl.depthMask(false);this.draw(mesh,tex,COLORS[material],material==='path'?5:material==='water'?(region.zone==='estuary'?3.25:3):['glass','coolglass'].includes(material)?4:['ember','shadow'].includes(material)?2:0,material==='shadow'?.25:material==='water'?.78:1);gl.depthMask(true);}
+    for(const {material,mesh} of (coastalExterior?this.outdoorMeshes:this.regions.get(region.zone)!)){
+      const tex=this.materials.get(material)??(material==='stone'?this.wallTexture:material==='floor'?this.floorTexture:this.white);
+      const water=material==='sea'||material==='water';
+      if(material==='shadow'||water)gl.depthMask(false);
+      const mode=material==='path'?5:material==='sea'?3.25:water?3:['glass','coolglass'].includes(material)?4:['ember','shadow'].includes(material)?2:0;
+      this.draw(mesh,tex,COLORS[material],mode,material==='shadow'?.25:water?.82:1);
+      gl.depthMask(true);
+    }
     const props:number[]=[];
-    if(greyhavenExterior){
+    if(coastalExterior){
       const amount=g.campaign!.villageGateOpen?Math.min(1,Math.max(0,(g.playTime-(g.campaign!.gateOpenedAt??-2))/.9)):0;
       for(const side of [-1,1]){const hinge=8*CELL+side*CELL/2,angle=amount*Math.PI*.48;for(let bar=0;bar<=6;bar++){const d=bar*CELL/12;regionBox(props,20*CELL-Math.sin(angle)*d,0,hinge-side*Math.cos(angle)*d,.07,2.7,.07);}for(const y of [.5,1.5,2.6]){const d=CELL/4,x=20*CELL-Math.sin(angle)*d,z=hinge-side*Math.cos(angle)*d;const a:Vec=[x+Math.sin(angle)*CELL/4,y,z+side*Math.cos(angle)*CELL/4],b:Vec=[x-Math.sin(angle)*CELL/4,y,z-side*Math.cos(angle)*CELL/4];regionQuad(props,a,b,[b[0],y+.08,b[2]],[a[0],y+.08,a[2]],[1,0,0]);}}
       this.transient(props,this.white,[.24,.23,.17]);
-      const open=g.campaign!.stage>=ESTUARY_STAGE.trail;
+      const open=coastalGateOpen(g);
       this.draw(open?this.coastalGates.open:this.coastalGates.closed,this.white,[.31,.30,.26]);
     }
     if(region.zone==='crypts'){
@@ -237,16 +244,17 @@ export class DungeonRenderer {
       for(const[x,y,z]of lights){const pulse=1+.06*Math.sin(clock*8+x);this.transient(this.billboard(x,z,.85,1.1,camera.yaw,[0,0,1,1],y-.35),this.glow,[1,.45,.16],2,.32);this.transient(this.billboard(x+.02*Math.sin(clock*11),z,.22*pulse,.59*pulse,camera.yaw,[0,0,1,1],y-.04),this.flame,[1,1,1],2);}
       gl.depthMask(true);
     }
-    if(region.zone==='estuary'){
-      this.drawEstuaryControls(g);
+    if(coastalExterior){
+      const estuary=regionOffset('estuary');
+      this.drawEstuaryControls(g,estuary.x*CELL,estuary.y*CELL);
       const c=g.campaign!;
       if(this.residents&&c.stage===ESTUARY_STAGE.mooring&&c.bellShortcut)
-        this.transient(this.billboard(22.4*CELL,11.4*CELL,.82,1.9,camera.yaw,[.75,0,1,1],-.13),this.residents,[1,1,1],1);
+        this.transient(this.billboard((estuary.x+22.4)*CELL,(estuary.y+11.4)*CELL,.82,1.9,camera.yaw,[.75,0,1,1],-.13),this.residents,[1,1,1],1);
     }
     this.drawExpeditionFixtures(g);
     // Opaque world geometry writes depth first; alpha cutout characters then occlude correctly.
     const sprites:{x:number;y:number;kind?:keyof typeof CREATURES;enemy?:Enemy;frame?:number;scale:number}[]=[];
-    for(const visible of greyhavenExterior?[REGION_WORLDS.village,REGION_WORLDS.road]:[region]){const origin=regionOffset(visible.zone);for(const e of visible.encounters){const active=battle?.encounter===e.id;if(!encounterActive(g,e.id)||g.phase==='victory'&&active)continue;const place=active&&battle?battlePosition(g.position,e,battle.time):e;sprites.push({...e,x:place.x+origin.x,y:place.y+origin.y,enemy:active?visibleEnemy(battle!):undefined,scale:active?framing?.scale??1:1});}for(const n of visible.residents)if(!(n.id==='lys'&&g.campaign!.recruited))sprites.push({...n,x:n.x+origin.x,y:n.y+origin.y,scale:1});}
+    for(const visible of coastalExterior?COASTAL_OUTDOORS.map(zone=>REGION_WORLDS[zone]):[region]){const origin=regionOffset(visible.zone);for(const e of visible.encounters){const active=battle?.encounter===e.id;if(!encounterActive(g,e.id)||g.phase==='victory'&&active)continue;const place=active&&battle?battlePosition(g.position,e,battle.time):e;sprites.push({...e,x:place.x+origin.x,y:place.y+origin.y,enemy:active?visibleEnemy(battle!):undefined,scale:active?framing?.scale??1:1});}for(const n of visible.residents)if(!(n.id==='lys'&&g.campaign!.recruited))sprites.push({...n,x:n.x+origin.x,y:n.y+origin.y,scale:1});}
     sprites.sort((a,b)=>Math.hypot(b.x-camera.x-offset.x,b.y-camera.y-offset.y)-Math.hypot(a.x-camera.x-offset.x,a.y-camera.y-offset.y));
     for(const s of sprites){if(s.frame!==undefined){if(this.residents)this.transient(this.billboard(s.x*CELL,s.y*CELL,.82,1.9,camera.yaw,[s.frame/4,0,(s.frame+1)/4,1]),this.residents,[1,1,1],1);continue;}if(!this.atlas||!s.kind)continue;
       const e=s.enemy;let pose=Math.floor(clock*1.7)%2;if(e){if(e.hp<=0||battle!.time-e.hurtAt<.24)pose=4;else if(battle!.time-e.strikeAt<.32)pose=3;else if(e.windup>0)pose=2;}const f=creatureFrame(s.kind,pose),attack=e&&battle!.time-e.strikeAt<.3?Math.sin((battle!.time-e.strikeAt)/.3*Math.PI)*.22:0;this.transient(this.billboard(s.x*CELL-Math.cos(camera.yaw)*attack,s.y*CELL-Math.sin(camera.yaw)*attack,f.width*s.scale,f.height*s.scale,camera.yaw,f.uv),this.atlas,e&&e.frozen&&e.stunned>0?[.56,.94,1]:e&&battle!.time-e.hurtAt<.18?[1.4,.74,.65]:[1,1,1],1);
@@ -254,10 +262,10 @@ export class DungeonRenderer {
     gl.depthMask(true);
   }
 
-  private drawEstuaryControls(g:Game){
+  private drawEstuaryControls(g:Game,originX:number,originZ:number){
     const c=g.campaign!,props:number[]=[],low=lowWater(g);
     for(const [point,operated] of [[SLUICE_WHEEL,low],[TIDE_GATE,c.stage>=ESTUARY_STAGE.ferrymaster]] as const){
-      const x=point.x*CELL,z=point.y*CELL-.67,angle=operated?.55:0;
+      const x=originX+point.x*CELL,z=originZ+point.y*CELL-.67,angle=operated?.55:0;
       for(let i=0;i<20;i++){
         const a=i*Math.PI/10+angle;
         regionBox(props,x+.42*Math.cos(a),1.24+.42*Math.sin(a),z,.15,.15,.10);
@@ -267,17 +275,17 @@ export class DungeonRenderer {
         for(let r=.04;r<.43;r+=.06)regionBox(props,x+r*Math.cos(a),1.24+r*Math.sin(a),z,.095,.095,.10);
       }
     }
-    const x=BELL_STEPS.x*CELL,z=(BELL_STEPS.y-.47)*CELL;
+    const x=originX+BELL_STEPS.x*CELL,z=originZ+(BELL_STEPS.y-.47)*CELL;
     if(!c.bellShortcut)regionBox(props,x,.03,z,1.46,2.16,.13);
     else regionBox(props,x+.77,.03,z+.72,.13,2.16,1.46);
     const closed=c.stage>=ESTUARY_STAGE.ferrymaster;
-    const gateX=(TIDE_GATE.x+.55)*CELL,gateZ=TIDE_GATE.y*CELL;
+    const gateX=originX+(TIDE_GATE.x+.55)*CELL,gateZ=originZ+TIDE_GATE.y*CELL;
     for(const edge of [-1.3,1.3])regionBox(props,gateX,-.72,gateZ+edge,.29,3.05,.23);
     regionBox(props,gateX,closed?-.59:1.05,gateZ,.23,1.22,CELL);
     this.transient(props,this.white,[.48,.35,.19]);
 
     if(c.stage<ESTUARY_STAGE.alone){
-      const hull:number[]=[],bx=22.4*CELL,bz=11.55*CELL;
+      const hull:number[]=[],bx=originX+22.4*CELL,bz=originZ+11.55*CELL;
       for(let i=-6;i<=6;i++){
         const width=1.01*(1-(i/7)**2);
         regionBox(hull,bx,-.62,bz+i*.39,width,.55,.4);
@@ -288,8 +296,8 @@ export class DungeonRenderer {
 
     const blend=Math.min(1,Math.max(0,(g.playTime-(c.expedition?.tideChangedAt??c.sluiceLoweredAt??-3))/1.8));
     const fill=low?1-blend:blend;
-    const deck:number[]=[],zWalk=FLOATING_WALKWAY.y*CELL,height=-1.08*(1-fill);
-    const start=(FLOATING_WALKWAY.start-.5)*CELL,end=(FLOATING_WALKWAY.end+.5)*CELL;
+    const deck:number[]=[],zWalk=originZ+FLOATING_WALKWAY.y*CELL,height=-1.08*(1-fill);
+    const start=originX+(FLOATING_WALKWAY.start-.5)*CELL,end=originX+(FLOATING_WALKWAY.end+.5)*CELL;
     for(let x=start+.16;x<end;x+=.32)regionBox(deck,x,height-.14,zWalk,.301,.14,2.46);
     for(const side of [-1,1]){
       regionBox(deck,(start+end)/2,height-.51,zWalk+side*.86,end-start,.43,.34);
@@ -298,7 +306,7 @@ export class DungeonRenderer {
     }
     this.transient(deck,this.materials.get('wood')??this.white,[.82,.77,.69]);
     if(fill>0){
-      const water:number[]=[],wx=LOCK_STAIRS.x*CELL,wz=LOCK_STAIRS.y*CELL,h=.17+fill*.69;
+      const water:number[]=[],wx=originX+LOCK_STAIRS.x*CELL,wz=originZ+LOCK_STAIRS.y*CELL,h=.17+fill*.69;
       regionQuad(water,[wx-1.10,h,wz-1.23],[wx+1.10,h,wz-1.23],[wx+1.10,h,wz+1.19],[wx-1.10,h,wz+1.19],[0,1,0]);
       this.transient(water,this.white,[.17,.39,.43],3.25,.91);
     }

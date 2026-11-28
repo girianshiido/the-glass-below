@@ -34,7 +34,7 @@ export class ChapterUI{
      ? '“Two short notes, then one long. That was how my brother called me home.”'
      : '“The coast road branches north from the pines. Neris keeps the boathouse at Saltreach.”';
    const invitation=rumor
-     ? this.dialogue('L',line)+this.dialogue('E','“Then ask Neris. Follow the side trail north from the first forest clearing. It passes under the old tollgate in the rocks. The path beyond it leads to Saltreach.”')
+     ? this.dialogue('L',line)+this.dialogue('E','“Then ask Neris. Take the side trail north from the first clearing. The old tollgate controls the bridge across the inlet. Follow the causeway on the far side to Saltreach.”')
      : this.dialogue('E',line);
    this.show('Elder Elara',invitation+(rumor?'<button class="primary" data-chapter="follow-bell">Follow the bell</button>':'')+report);
    return;

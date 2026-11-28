@@ -11,8 +11,14 @@ export const ESTUARY_STAGE={
   rumor:7, trail:8, sluice:9, drained:10, mooring:11, alone:12, ferrymaster:13, joined:14,
 } as const;
 
-export const ROAD_TO_ESTUARY = {x:11,y:5};
-export const ROAD_FROM_ESTUARY = {x:ROAD_TO_ESTUARY.x,y:ROAD_TO_ESTUARY.y+1};
+export const COASTAL_GATE = {x:11,y:4};
+export const COASTAL_SHORE_Y = 4.5;
+export const ROAD_TO_ESTUARY = {x:17,y:1};
+export const ESTUARY_LINK = {x:0,y:12};
+export const COASTAL_BRIDGE_TILES = [
+  ...Array.from({length:4},(_,i)=>({x:COASTAL_GATE.x,y:COASTAL_GATE.y-i})),
+  ...Array.from({length:ROAD_TO_ESTUARY.x-COASTAL_GATE.x},(_,i)=>({x:COASTAL_GATE.x+1+i,y:ROAD_TO_ESTUARY.y})),
+];
 export const SLUICE_WHEEL = {x:19,y:2};
 export const MOORING = {x:21,y:11};
 export const TIDE_GATE = {x:24,y:14};
@@ -25,7 +31,7 @@ export const ESTUARY: RegionWorld = {
   spawn:{x:1,y:12}, direction:0, outdoor:true, ceiling:0,
   buildings:estuaryBuildings, residents:[], entrances:[{id:'neris',x:11,y:9,direction:3}],
   passages:[
-    {id:'estuary-return',x:0,y:12,to:'road',spawn:ROAD_FROM_ESTUARY,direction:1,label:'Old Pine Road'},
+    {id:'estuary-return',...ESTUARY_LINK,to:'road',spawn:ROAD_TO_ESTUARY,direction:1,label:'Old Pine Road'},
     {id:'lock-stairs',...LOCK_STAIRS,to:'lockworks',spawn:{x:2,y:11},direction:3,label:'Descend beneath the quay'},
     {id:'warehouse-walkway',x:FLOATING_WALKWAY.end,y:FLOATING_WALKWAY.y,to:'warehouse',spawn:{x:3,y:14},direction:3,label:'Enter the bonded warehouse'},
     {id:'bell-shortcut',...BELL_STEPS,to:'lockworks',spawn:{x:13,y:1},direction:2,label:'Descend the bell tower stairs'},

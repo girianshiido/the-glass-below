@@ -1,12 +1,12 @@
 import {EXPEDITION_FIXTURES,ANNEALING_DOOR,BELL_BARRIER} from '../src/expedition-world.ts';
 import {cryptAccess,keeperAccess,lowWater} from '../src/expedition-state.ts';
-import {MOORING,SLUICE_WHEEL,TIDE_GATE,ROAD_TO_ESTUARY,ROAD_FROM_ESTUARY} from '../src/estuary-world.ts';
+import {MOORING,SLUICE_WHEEL,TIDE_GATE,ROAD_TO_ESTUARY,COASTAL_GATE,COASTAL_BRIDGE_TILES,ESTUARY_LINK} from '../src/estuary-world.ts';
 import {CRYPT_TORCHES} from '../src/scene-lights.ts';
 import {forestTrees,CELL} from '../src/region-geometry.ts';
 import {test} from 'node:test';import assert from 'node:assert/strict';
 import {createGame,move,interact,turn,useSkill,continueAfterBattle,partySkills} from '../src/engine.ts';
 import {setupCampaign,campaignAction,ROAD_ENCOUNTERS,companion,travel} from '../src/campaign.ts';
-import {REGION_WORLDS,regionOf,regionWall,nearbyResident,regionSight,regionOffset,sharedOutdoors,entranceAhead,nearbyEntrance,entrancePoint,residentApproach,INTERACTION_REACH,RESIDENT_STOP_DISTANCE,trailCoverage,nearbyFixture,regionObstacle,COASTAL_TRAIL_VIEW} from '../src/region-world.ts';
+import {REGION_WORLDS,regionOf,regionWall,nearbyResident,regionSight,regionOffset,sharedOutdoors,entranceAhead,nearbyEntrance,entrancePoint,residentApproach,INTERACTION_REACH,RESIDENT_STOP_DISTANCE,trailCoverage,nearbyFixture,regionObstacle} from '../src/region-world.ts';
 import {DIRECTIONS,CHEST,GATE} from '../src/world.ts';
 import {serialize,deserialize} from '../src/save.ts';
 const same=(a,b)=>a.x===b.x&&a.y===b.y;
@@ -52,20 +52,37 @@ test('Inn and merchant are reached through doors, and remain inside their buildi
 test('Version-two saves survive the smaller village and woodland trail without losing progress',()=>{const g=setupCampaign(createGame());g.campaign.worldVersion=2;g.position={x:23,y:10};g.heroes[0].hp=67;g.gold=81;let restored=deserialize(serialize(g));assert(restored);assert.deepEqual(restored.position,REGION_WORLDS.village.spawn);assert.equal(restored.heroes[0].hp,67);assert.equal(restored.gold,81);g.campaign.zone='road';g.position={x:12,y:12};restored=deserialize(serialize(g));assert(restored);assert(!regionWall('road',restored.position.x,restored.position.y));assert.equal(restored.campaign.worldVersion,3);});
 
 test('Forest canopies stay clear of every traversable trail tile',()=>{const trees=forestTrees();assert(trees.length>100);for(const tree of trees)for(let y=0;y<21;y++)for(let x=0;x<25;x++)if(!regionWall('road',x,y)){const distance=Math.hypot(Math.max(0,Math.abs(tree.x-x*CELL)-CELL/2),Math.max(0,Math.abs(tree.z-y*CELL)-CELL/2));assert(distance>=tree.radius+.45-1e-8);}});
-test('The tollgate is reached by a side trail, stays locked, and returns travellers to the same fork',()=>{
+test('The bridge has no bypass, and the playable deck joins both shores at the same world coordinates',()=>{
  const g=setupCampaign(createGame());
  assert(campaignAction(g,'accept'));assert(travel(g,'road'));
- g.position={x:ROAD_TO_ESTUARY.x,y:8};g.direction=3;
- assert(move(g,0));assert(move(g,0));
- assert.deepEqual(g.position,ROAD_FROM_ESTUARY);
+ const fork={x:COASTAL_GATE.x,y:8};
+ const beforeGate={x:COASTAL_GATE.x,y:COASTAL_GATE.y+1};
+ g.position=fork;g.direction=3;
+ for(let i=0;i<3;i++)assert(move(g,0));
+ assert.deepEqual(g.position,beforeGate);
  assert(!move(g,0));assert.equal(g.campaign.zone,'road');
- assert(!move(g,-1));assert(!move(g,1),'The rock shoulders cannot be walked around here');
+ assert.equal(route('road',fork,ROAD_TO_ESTUARY,p=>!!regionObstacle(g,p)),undefined);
+ assert(route('road',fork,{x:23,y:6},p=>!!regionObstacle(g,p)),'The forest road to the glassworks remains open');
+ const distance=(a,b)=>Math.abs(a.x-b.x)+Math.abs(a.y-b.y);
  g.campaign.stage=8;g.campaign.recruited=true;
- assert(move(g,0));assert.equal(g.campaign.zone,'estuary');
- g.direction=2;assert(move(g,0));assert.equal(g.campaign.zone,'road');
- assert.deepEqual(g.position,ROAD_FROM_ESTUARY);
+ for(const [i,tile] of COASTAL_BRIDGE_TILES.entries()){
+   const heading=DIRECTIONS.findIndex(([dx,dy])=>g.position.x+dx===tile.x&&g.position.y+dy===tile.y);
+   assert(heading>=0);g.direction=heading;
+   assert(move(g,0));
+   if(i<COASTAL_BRIDGE_TILES.length-1){
+     assert.equal(g.campaign.zone,'road');assert.deepEqual(g.position,tile);
+   }
+ }
+ assert.equal(g.campaign.zone,'estuary');
+ assert.deepEqual(g.position,ESTUARY_LINK);
+ assert(sharedOutdoors('road','estuary'));
+ const worldPosition=(zone,p)=>({x:p.x+regionOffset(zone).x,y:p.y+regionOffset(zone).y});
+ assert.deepEqual(worldPosition('estuary',g.position),worldPosition('road',ROAD_TO_ESTUARY));
+ assert(move(g,0));g.direction=2;assert(move(g,0));
+ assert.equal(g.campaign.zone,'road');
+ assert.deepEqual(g.position,ROAD_TO_ESTUARY);
+ assert.equal(distance(worldPosition('estuary',ESTUARY_LINK),worldPosition('road',g.position)),0);
  assert(deserialize(serialize(g)));
- for(const {x,y} of COASTAL_TRAIL_VIEW)assert(trailCoverage(x,y)>.9);
 });
 test('The forest ground uses a feathered, irregular trail rather than clipped square edges',()=>{for(const e of ROAD_ENCOUNTERS)assert(trailCoverage(e.x,e.y)>.9);const edge=Array.from({length:30},(_,i)=>trailCoverage(4+i/15,10.5));assert(Math.max(...edge)-Math.min(...edge)>.2);assert(edge.some(v=>v>0&&v<1));assert.equal(trailCoverage(6,14),0);});
 
@@ -93,7 +110,7 @@ test('An existing chapter-one save can reach Saltreach, drain the lock, meet the
  assert(campaignAction(g,'follow-bell'));
  go(g,{x:19,y:8});g.direction=0;interact(g);
  assert.equal(g.campaign.zone,'road');
- go(g,ROAD_FROM_ESTUARY);g.direction=3;assert(move(g,0));
+ go(g,{x:ROAD_TO_ESTUARY.x-1,y:ROAD_TO_ESTUARY.y});g.direction=0;assert(move(g,0));
  assert.equal(g.campaign.zone,'estuary');
  assert(!campaignAction(g,'drain-lock'));
 

@@ -1,6 +1,6 @@
 import {ANNEALING,WAREHOUSE,ANNEALING_DOOR,SERVICE_DOOR,BELL_BARRIER,EXPEDITION_FIXTURES} from './expedition-world.ts';
 import {burnersLit,cryptAccess,keeperAccess,lowWater,isFloatingWalkway} from './expedition-state.ts';
-import {ESTUARY_STAGE,ESTUARY,LOCKWORKS,ROAD_TO_ESTUARY,SLUICE_WHEEL,MOORING,TIDE_GATE} from './estuary-world.ts';
+import {ESTUARY_STAGE,ESTUARY,LOCKWORKS,ROAD_TO_ESTUARY,COASTAL_GATE,COASTAL_BRIDGE_TILES,ESTUARY_LINK,SLUICE_WHEEL,MOORING,TIDE_GATE} from './estuary-world.ts';
 import type {Zone} from './campaign.ts';
 import type {Game} from './engine.ts';
 import {MAP as OLD_MAP,ENCOUNTERS as OLD_ENCOUNTERS,DIRECTIONS} from './world.ts';
@@ -20,8 +20,9 @@ village[8][20]='.';for(const[x,y]of VILLAGE_DETAILS)village[y][x]='#';
 // A narrow woodland trail, with small clearings and connected steps at its bends.
 let previous=10;for(let x=0;x<25;x++){const center=x<9?10:x<17?10-Math.floor((x-8)/2):6;for(let y=Math.min(previous,center);y<=Math.max(previous,center);y++)road[y][x]='.';if(x<4)for(let y=9;y<=11;y++)road[y][x]='.';previous=center;}
 rect(road,10,8,3,3,'.');rect(road,18,5,3,3,'.');road[10][0]='.';road[6][24]='.';
-// The coastal road branches north into a narrow cut, beyond the first clearing.
-for(let y=ROAD_TO_ESTUARY.y;y<8;y++)road[y][ROAD_TO_ESTUARY.x]='.';
+// The spur reaches the tollgate before crossing the inlet and joining the quay road.
+for(let y=5;y<8;y++)road[y][COASTAL_GATE.x]='.';
+for(const {x,y} of COASTAL_BRIDGE_TILES)road[y][x]='.';
 // Broad furnace and workshop halls, with a traversable opening between their columns.
 rect(works,3,4,4,4);rect(works,16,4,4,4);rect(works,3,12,4,3);rect(works,17,12,3,3);
 for(const [x,y]of [[9,5],[13,5],[9,12],[13,12]])works[y][x]='#';
@@ -34,7 +35,7 @@ for(let x=11;x<=16;x++){crypt[9][x]='#';crypt[13][x]='#';}for(let y=10;y<=13;y++
 const finish=(m:string[][])=>m.map(r=>r.join(''));
 export const REGION_WORLDS:Record<Zone,RegionWorld>={
  village:{zone:'village',map:finish(village),spawn:{x:10,y:11},direction:3,buildings,residents:[{id:'elara',name:'Elder Elara',frame:0,x:9,y:6}],entrances:[{id:'inn',x:4,y:8,direction:3},{id:'shop',x:16,y:11,direction:3}],passages:[{id:'pine-gate',x:20,y:8,to:'road',spawn:{x:0,y:10},direction:0,label:'Old Pine Road'}],encounters:[],ceiling:0,outdoor:true},
- road:{zone:'road',map:finish(road),spawn:{x:1,y:10},direction:0,buildings:[],residents:[],entrances:[],passages:[{id:'village-return',x:0,y:10,to:'village',spawn:{x:20,y:8},direction:2,label:'Greyhaven'},{id:'glassworks-door',x:24,y:6,to:'glassworks',spawn:{x:11,y:16},direction:3,label:'Enter the glassworks'},{id:'estuary-arch',...ROAD_TO_ESTUARY,to:'estuary',spawn:{x:1,y:12},direction:0,label:'Follow the causeway to Saltreach'}],encounters:[{id:'road-shards',x:6,y:10,kind:'scavenger'},{id:'road-hollow',x:13,y:8,kind:'scavenger'},{id:'road-lantern',x:20,y:6,kind:'wraith'},{id:'pine-root',x:9,y:10,kind:'scavenger'},{id:'pine-bend',x:17,y:6,kind:'scavenger'}],ceiling:0,outdoor:true},
+ road:{zone:'road',map:finish(road),spawn:{x:1,y:10},direction:0,buildings:[],residents:[],entrances:[],passages:[{id:'village-return',x:0,y:10,to:'village',spawn:{x:20,y:8},direction:2,label:'Greyhaven'},{id:'glassworks-door',x:24,y:6,to:'glassworks',spawn:{x:11,y:16},direction:3,label:'Enter the glassworks'},{id:'coastal-crossing',...ROAD_TO_ESTUARY,to:'estuary',spawn:ESTUARY_LINK,direction:0,label:'Follow the causeway to Saltreach'}],encounters:[{id:'road-shards',x:6,y:10,kind:'scavenger'},{id:'road-hollow',x:13,y:8,kind:'scavenger'},{id:'road-lantern',x:20,y:6,kind:'wraith'},{id:'pine-root',x:9,y:10,kind:'scavenger'},{id:'pine-bend',x:17,y:6,kind:'scavenger'}],ceiling:0,outdoor:true},
  glassworks:{zone:'glassworks',map:finish(works),spawn:{x:11,y:16},direction:3,buildings:[],residents:[{id:'lys',name:'Lys',frame:3,x:18,y:3}],entrances:[],passages:[{id:'works-return',x:11,y:18,to:'road',spawn:{x:23,y:6},direction:2,label:'Old Pine Road'},{id:'annealing-door',...ANNEALING_DOOR,to:'annealing',spawn:{x:11,y:16},direction:3,label:'Enter the annealing wing'},{id:'annealing-shortcut',...SERVICE_DOOR,to:'annealing',spawn:{x:11,y:2},direction:1,label:'Enter the annealing wing by the service passage'},{id:'crypt-stairs',x:19,y:0,to:'crypts',spawn:{x:1,y:1},direction:0,label:'Descend into the crypts'}],encounters:[{id:'furnace',kind:'wraith',x:11,y:7},{id:'kiln-crawler',kind:'scavenger',x:7,y:10},{id:'loading-bay',kind:'wraith',x:20,y:10}],ceiling:6.5,outdoor:false},
  crypts:{zone:'crypts',map:finish(crypt),spawn:{x:1,y:1},direction:0,buildings:[],residents:[],entrances:[],passages:[{id:'crypt-return',x:1,y:1,to:'glassworks',spawn:{x:19,y:1},direction:1,label:'Climb to the glassworks'},{id:'warden-stairs',x:17,y:13,to:'glassworks',spawn:{x:19,y:1},direction:1,label:'Climb to the glassworks'}],encounters:OLD_ENCOUNTERS.map(e=>({...e})),ceiling:4.3,outdoor:false},
  estuary:ESTUARY, lockworks:LOCKWORKS, annealing:ANNEALING, warehouse:WAREHOUSE,
@@ -43,6 +44,8 @@ export function regionOf(g:Game){return REGION_WORLDS[g.campaign?.zone??'crypts'
 export function regionWall(zone:Zone,x:number,y:number){return REGION_WORLDS[zone].map[y]?.[x]!=='.';}
 export function regionObstacle(g:Game,point:Point):string|undefined {
   const zone=g.campaign?.zone;
+  if(zone==='road'&&point.x===COASTAL_GATE.x&&point.y===COASTAL_GATE.y&&!coastalGateOpen(g))
+    return 'The coastal bridge is locked. Speak to Elder Elara.';
   if(zone==='estuary'&&isFloatingWalkway(point)&&lowWater(g))return 'The floating walkway sits below the quay. Raise the water at the sluice.';
   if(zone==='lockworks'&&point.x===BELL_BARRIER.x&&point.y===BELL_BARRIER.y&&!keeperAccess(g))
     return 'The bell bridge is held by the relay. Read the freight register and trace the signal.';
@@ -70,7 +73,7 @@ export function passageLocked(g:Game,p:Passage){
   if(p.id==='warehouse-walkway')return c.stage<ESTUARY_STAGE.sluice||lowWater(g);
   if(p.id==='warehouse-return')return lowWater(g);
   if(p.id==='warehouse-culvert')return !c.expedition?.culvert||!lowWater(g);
-  if(p.id==='estuary-arch')return c.stage<ESTUARY_STAGE.trail;
+  if(p.id==='coastal-crossing')return !coastalGateOpen(g);
   if(p.id==='lock-stairs')return !lowWater(g);
   if(p.id==='bell-stairs')return c.stage<ESTUARY_STAGE.mooring;
   if(p.id==='bell-shortcut')return !c.bellShortcut||!lowWater(g);
@@ -92,7 +95,7 @@ export function passageHint(g:Game,p:Passage){
     'warehouse-walkway':stage<ESTUARY_STAGE.sluice?'Ask the ferrymaster about the bonded warehouse.':'Raise the sluice to float the walkway.',
     'warehouse-return':'Use the culvert, or raise the walkway from Saltreach.',
     'warehouse-culvert':lowWater(g)?'The culvert bolts open from below.':'Lower the water before entering the culvert.',
-    'estuary-arch':'The old tollgate is locked.',
+    'coastal-crossing':'The coastal bridge is locked.',
     'lock-stairs':'Water covers the lower stairs.',
     'bell-stairs':'The Keeper is still guarding the tower stairs.',
     'bell-shortcut':cShortcutMessage(g),
@@ -123,9 +126,24 @@ export function nearbyFixture(g:Game,origin:Point=g.position){
 
 export function revealRegion(g:Game){const c=g.campaign;if(!c)return;const w=regionOf(g),seen=new Set(c.worldSeen?.[c.zone]??[]);for(let y=Math.max(0,g.position.y-10);y<Math.min(w.map.length,g.position.y+11);y++)for(let x=Math.max(0,g.position.x-10);x<Math.min(w.map[0].length,g.position.x+11);x++){if(regionSight(c.zone,g.position,{x,y},g.gateOpen))seen.add(`${x},${y}`);else if(regionWall(c.zone,x,y))for(const[dx,dy]of [[1,0],[-1,0],[0,1],[0,-1]])if(regionSight(c.zone,g.position,{x:x+dx*.6,y:y+dy*.6},g.gateOpen))seen.add(`${x},${y}`);}c.worldSeen??={};c.worldSeen[c.zone]=[...seen];}
 
-/** The gate and first trail tile occupy exactly the same point in the outdoor scene. */
-export function regionOffset(zone:Zone):Point{return zone==='road'?{x:20,y:-2}:{x:0,y:0};}
-export function sharedOutdoors(a:Zone,b:Zone){return (a==='village'||a==='road')&&(b==='village'||b==='road');}
+const ROAD_OFFSET={x:20,y:-2};
+const ESTUARY_OFFSET={
+  x:ROAD_OFFSET.x+ROAD_TO_ESTUARY.x-ESTUARY_LINK.x,
+  y:ROAD_OFFSET.y+ROAD_TO_ESTUARY.y-ESTUARY_LINK.y,
+};
+export const COASTAL_OUTDOORS=['village','road','estuary'] as const;
+export function isCoastalOutdoor(zone:Zone){
+  return COASTAL_OUTDOORS.some(outdoor=>outdoor===zone);
+}
+export function coastalGateOpen(g:Game){return (g.campaign?.stage??0)>=ESTUARY_STAGE.trail;}
+
+/** Positions on both sides of an outdoor boundary share the same rendered coordinates. */
+export function regionOffset(zone:Zone):Point{
+  if(zone==='road')return ROAD_OFFSET;
+  if(zone==='estuary')return ESTUARY_OFFSET;
+  return {x:0,y:0};
+}
+export function sharedOutdoors(a:Zone,b:Zone){return isCoastalOutdoor(a)&&isCoastalOutdoor(b);}
 /** The visible door sits just inside the front edge of its doorstep cell. */
 export function entrancePoint(p:Entrance):Point{const[dx,dy]=DIRECTIONS[p.direction];return{x:p.x+dx*.45,y:p.y+dy*.45};}
 export function entranceAhead(g:Game,origin:Point=g.position){const door=nearbyEntrance(g,origin);return door?.direction===g.direction?door:undefined;}
@@ -136,20 +154,7 @@ export function encounterPresent(g:Game,id:string){
   return !g.cleared.has(id)||g.roaming.has(id);
 }
 export function roadThreat(g:Game){if(g.campaign?.zone!=='road'||g.phase!=='explore')return;return regionOf(g).encounters.filter(e=>encounterPresent(g,e.id)&&Math.hypot(e.x-g.position.x,e.y-g.position.y)<=2.15&&regionSight('road',g.position,e)).sort((a,b)=>Math.hypot(a.x-g.position.x,a.y-g.position.y)-Math.hypot(b.x-g.position.x,b.y-g.position.y))[0];}
-// After the gate, the coastal road bends behind the far shoulder of the ravine.
-const {x:coastalX,y:coastalY}=ROAD_TO_ESTUARY;
-export const COASTAL_TRAIL_VIEW=[
-  ROAD_TO_ESTUARY,
-  {x:coastalX,y:coastalY-1.3},
-  {x:coastalX+.3,y:coastalY-2.2},
-  {x:coastalX+1.25,y:coastalY-3.15},
-  {x:coastalX+2.6,y:coastalY-3.35},
-];
 const trailSegments:{ax:number;ay:number;bx:number;by:number}[]=[];
 for(let y=0;y<road.length;y++)for(let x=0;x<road[0].length;x++)if(road[y][x]==='.')for(const[dx,dy]of [[1,0],[0,1]])if(road[y+dy]?.[x+dx]==='.')trailSegments.push({ax:x,ay:y,bx:x+dx,by:y+dy});
-for(let i=1;i<COASTAL_TRAIL_VIEW.length;i++){
-  const a=COASTAL_TRAIL_VIEW[i-1],b=COASTAL_TRAIL_VIEW[i];
-  trailSegments.push({ax:a.x,ay:a.y,bx:b.x,by:b.y});
-}
 /** Soft, uneven banks follow the connected path rather than the square tile perimeter. */
 export function trailCoverage(x:number,y:number){let distance=Infinity;for(const s of trailSegments){const dx=s.bx-s.ax,dy=s.by-s.ay,t=Math.max(0,Math.min(1,((x-s.ax)*dx+(y-s.ay)*dy)/(dx*dx+dy*dy)));distance=Math.min(distance,Math.hypot(x-s.ax-t*dx,y-s.ay-t*dy));}const rough=.047*Math.sin(x*17+y*23)+.035*Math.sin(x*37-y*13)+.025*Math.sin(x*7+y*9),width=.48+.065*Math.sin(x*1.9+y*.8)+rough;return Math.max(0,Math.min(1,(width+.13-distance)/.22));}
