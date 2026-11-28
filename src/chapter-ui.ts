@@ -1,5 +1,5 @@
 import {burnersLit,cryptAccess,lowWater} from './expedition-state.ts';
-import {campaignAction,campaignObjective,xpNeeded,ESTUARY_STAGE,activeHero,companion} from './campaign.ts';
+import {campaignAction,campaignObjective,xpNeeded,ESTUARY_STAGE,activeHero,companion,partyNeedsRest,REST_COST} from './campaign.ts';
 import type {Zone} from './campaign.ts';
 import {skillPower,SKILLS,partySkills} from './engine.ts';
 import type {Game} from './engine.ts';
@@ -93,6 +93,10 @@ export class ChapterUI{
    return;
  }
  if(action==='part-ways'){
+   if(g.heroes[0].hp<=0){
+     this.show('The mooring','<p class="dialog-intro">Kael needs to get back on his feet before Lys can leave. Use a healing tonic or rest at Neris’s boathouse.</p><button class="secondary" data-chapter="walk">Return to the quay</button>');
+     return;
+   }
    this.show('The mooring',this.dialogue('L','“The keeper’s tally marks him as alive. I was wrong about who rang the bell, but I know which channel his barge took. If I launch now, I can catch it.”')+this.dialogue('K','“Then go. The tide gate is still open. I will keep the water out of the houses.”')+'<button class="primary" data-chapter="lys-departs">See Lys off</button>');
    return;
  }
@@ -117,14 +121,26 @@ export class ChapterUI{
    return;
  }
  if(action==='lys'){this.show('Lys',this.dialogue('L',c.stage<4?'“Do not come closer. The Watcher wakes when it hears a name. Break its lantern, and I can reach you.”':c.stage===4?'“You broke its hold. I came here for my brother. The furnace speaks with his voice. Let me come with you.”':'“The prism below is only one fragment. Someone built a whole network beneath these villages.”')+(c.stage===4?'<button class="primary" data-chapter="recruit">Ask Lys to join you</button>':c.recruited?'<button class="primary" data-chapter="walk">Find the kiln stairs</button>':'<button class="primary" data-chapter="furnace">Confront the Watcher</button>'));return;}
- if(action==='inn'){this.interior('inn','The Lantern & Thorn','<p class="service-quote">“A warm room. A meal. A few things the glass has not taken from us. Rest while you can.”</p>'+`<p class="reward-line">Restore the party's HP and MP · 5 shards</p><button class="primary" data-chapter="rest" ${g.gold<5?'disabled':''}>Rest · 5 shards</button>`);return;}
+ if(action==='inn'){this.interior('inn','The Lantern & Thorn','<p class="service-quote">“A warm room. A meal. A few things the glass has not taken from us. Rest while you can.”</p>'+this.restOption());return;}
  if(action==='shop'){this.shop();return;}
  if(action.startsWith('buy-')){const ok=campaignAction(g,action);this.changed();this.shop(ok?'Purchase complete.':'Not enough shards or already owned.');return;}
- if(action==='rest'){if(campaignAction(g,action)){this.changed();this.interior('inn','A quiet night','<p class="service-quote">“You look more like yourself. That matters, these days.”</p>'+'<p class="reward-line">HP and MP fully restored.</p>');}return;}
+ if(action==='rest'){
+   if(campaignAction(g,action)){
+     this.changed();
+     if(c.zone==='estuary')this.neris(false,true);
+     else this.interior('inn','A quiet night','<p class="service-quote">“You look more like yourself. That matters, these days.”</p><p class="reward-line">HP and MP fully restored.</p>');
+   }
+   return;
+ }
  if(action==='potion'){if(campaignAction(g,action)){this.changed();this.party();}return;}
  }
  private interior(kind:'inn'|'shop'|'neris',title:string,html:string){this.show(title,`<section class="service-scene service-${kind}" aria-label="${kind==='inn'?'Inside Mara’s inn':kind==='shop'?'Inside Tovin’s shop':'Inside Neris’s boathouse'}"><div class="service-ui">${html}<button class="secondary service-leave" data-chapter="walk">Return outside</button></div></section>`);document.getElementById('dialog')!.classList.add('service-dialog');}
- private neris(returned=false){
+ private restOption(){
+   const g=this.get();
+   if(!partyNeedsRest(g))return '';
+   return `<button class="secondary" data-chapter="rest" ${g.gold<REST_COST?'disabled':''}>Rest · ${REST_COST} shards</button>`;
+ }
+ private neris(returned=false,rested=false){
    const c=this.get().campaign!,stage=c.stage;
    const lines:Record<number,string>={
      [ESTUARY_STAGE.trail]:'“There’s a register in the bonded warehouse across the floating walkway. The bell sounds from under the quay. I can show you how to free the wheel to reach the old relay.”',
@@ -141,7 +157,8 @@ export class ChapterUI{
      ?'<button class="secondary" data-chapter="return-lantern">Return the signal lantern</button>':'';
    const reply=returned?'<p class="service-quote">“My father taught me to signal the ferries with this. You’ve brought something home that I thought the tide had taken.”</p><p class="reward-line">+30 shards · 2 healing tonics</p>'
      :`<p class="service-quote">${lines[stage]??'“The tide turns before dusk.”'}</p>`;
-   this.interior('neris','Neris’s boathouse',reply+button+lantern);
+   const rest=rested?'<p class="reward-line">HP and MP fully restored.</p>':this.restOption();
+   this.interior('neris','Neris’s boathouse',reply+button+lantern+rest);
 
  }
  private close(){(document.getElementById('dialog')as HTMLDialogElement).close();}

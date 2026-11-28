@@ -13,8 +13,8 @@ Kael reaches Greyhaven with a letter he does not remember receiving. The village
 - Greyhaven includes Elder Elara, Mara's inn and Tovin's provisions. Dialogue and a journal track the chapter through its final report.
 - Greyhaven, Old Pine Road, the glassworks and the crypts form a connected journey. All four regions use first-person 3D exploration, with distant scenery, broad village squares, forest clearings and large furnace and crypt halls. The compact village has a circular fountain with animated water, benches, planters, textured masonry, glazed windows, brick chimneys and small hanging pictograms. Low mist drifts through the outdoor scene. The trail has soft, uneven earth/grass banks, and tree canopies stay clear of the walkable path. Exterior lighting is fixed in the world; it does not follow the camera. The eastern village gate opens visibly; village and road share one outdoor scene, so walking through the gate has no fade or camera jump. Doors and stairs connect the remaining regions on foot. The regional map is an orientation aid, without fast travel.
 - Elara and Lys appear as illustrated full-body characters in the 3D world. Mara and Tovin remain inside their inn and shop: reach their doorstep and walk forward again to open original illustrated interiors with service menus. Leaving returns to the same doorstep. Kael and Lys have portraits in the party interface.
-- Shared party XP and levels up to 20. Stats and skill power increase with level; Lys joins at the party's current level. Level-ups fully restore the active party.
-- Buy a tempered weapon, protective leather or a frostglass charm. Their attack, HP, defence and spell bonuses are applied in combat. Healing tonics restore 80 HP; the inn restores the party for 5 shards.
+- Shared party XP and levels up to 20. Stats and skill power increase with level; Lys joins at the party's current level. Current HP and MP carry over between fights and across level-ups.
+- Buy a tempered weapon, protective leather or a frostglass charm. Their attack, HP, defence and spell bonuses are applied in combat. Healing tonics restore 80 HP. Rest at the Greyhaven inn or Neris’s boathouse in Saltreach for 5 shards to recover both HP and MP. The crypt spring offers one full recovery.
 - Automatic attacks, manual Fracture, Frost Shard and Mending Seal; tactical pause queues one order per hero, with ×1 / ×2 speed. Spell costs and current power are visible in their descriptions.
 - Compact responsive skill buttons show icons, names and MP costs; detailed descriptions and shortcuts remain in tooltips and the party sheet.
 - Animated blade strokes, impact ripples, a gathering frost sigil with converging shards, and healing rings with rising motes. Effects freeze with tactical pause and respect reduced motion.
@@ -45,7 +45,7 @@ Armoured enemies take reduced damage until Fracture breaks their shell. Some wra
 
 ## Returning patrols
 
-Old Pine Road has five initial encounters. Three still count towards Elara's commission. The glassworks has two new threats along its side aisles. Ordinary sites can repopulate after **20 seconds of active play outside the sector and out of sight**. Up to two returning patrols can be active in each campaign area independently. Story encounters stay cleared and returning patrols never undo quest progress. They grant reduced rewards of 10 shards, 12 XP, and 6 HP and 4 MP per active hero.
+Old Pine Road has five initial encounters. Three still count towards Elara's commission. The glassworks has two new threats along its side aisles. Ordinary sites can repopulate after **20 seconds of active play outside the sector and out of sight**. Up to two returning patrols can be active in each campaign area independently. Story encounters stay cleared and returning patrols never undo quest progress. They grant reduced rewards of 10 shards and 12 XP.
 
 ## Controls
 

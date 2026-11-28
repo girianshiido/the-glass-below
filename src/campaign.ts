@@ -11,6 +11,7 @@ export const ROAD_ENCOUNTERS=REGION_WORLDS.road.encounters.filter(e=>e.id.starts
 export const FURNACE=REGION_WORLDS.glassworks.encounters[0];
 export const CAMPAIGN_ENCOUNTERS=Object.values(REGION_WORLDS).flatMap(world=>world.encounters);
 export const PATROL_DELAY=20;
+export const REST_COST=5;
 export const CAMPAIGN_PATROL_LIMIT=2;
 export const CAMPAIGN_PATROLS=Object.values(REGION_WORLDS).map(world=>({
   zone:world.zone,
@@ -27,12 +28,13 @@ export function companion(g:Game):'lys'|'neris'|undefined {
 }
 export function setupCampaign(g:Game){g.campaign={expedition:{},worldVersion:3,villageGateOpen:false,zone:'village',stage:0,recruited:false,level:1,xp:0,potions:3,weapon:'iron',armor:'travel',charm:false,introRead:false,roadCleared:[],roadAwayAt:{},visited:['village']};g.position={...REGION_WORLDS.village.spawn};g.direction=3;g.gold=20;refreshStats(g);return g;}
 export function activeHero(g:Game,index:number){return index===0||companion(g)!==undefined;}
+export function partyNeedsRest(g:Game){return g.heroes.some((h,i)=>activeHero(g,i)&&(h.hp<h.maxHp||h.mp<h.maxMp));}
 export function xpNeeded(level:number){return 50+(level-1)*35;}
 export function refreshStats(g:Game){const c=g.campaign;if(!c)return;const ferrymaster=companion(g)==='neris';g.heroes[1].name=ferrymaster?'Neris':'Lys';g.heroes.forEach((h,i)=>{h.maxHp=(i===0?180:ferrymaster?165:140)+(c.level-1)*(i===0?18:14)+(c.armor==='warden'?20:0);h.maxMp=(i===0?32:ferrymaster?38:44)+(c.level-1)*4+(c.expedition?.courierReported?4:0);h.attack=(i===0?16:ferrymaster?13:10)+(c.level-1)*3+(c.weapon==='tempered'?5:0);h.hp=Math.min(h.hp,h.maxHp);h.mp=Math.min(h.mp,h.maxMp);});}
-export function grantXp(g:Game,amount:number){const c=g.campaign;if(!c)return false;c.xp+=amount;let leveled=false;while(c.level<20&&c.xp>=xpNeeded(c.level)){c.xp-=xpNeeded(c.level);c.level++;leveled=true;}refreshStats(g);if(leveled)g.heroes.forEach((h,i)=>{if(activeHero(g,i)){h.hp=h.maxHp;h.mp=h.maxMp;}});return leveled;}
+export function grantXp(g:Game,amount:number){const c=g.campaign;if(!c)return false;c.xp+=amount;let leveled=false;while(c.level<20&&c.xp>=xpNeeded(c.level)){c.xp-=xpNeeded(c.level);c.level++;leveled=true;}refreshStats(g);return leveled;}
 export function campaignVictory(g:Game,id:string,returning:boolean){const c=g.campaign;if(!c)return'';
  const xp=returning?12:id==='bell-keeper'?145:id==='guardian'?120:id==='furnace'?80:55;
- let note=grantXp(g,xp)?`Level ${c.level} reached · HP and MP restored`:`+${xp} XP`;
+ let note=grantXp(g,xp)?`+${xp} XP · Level ${c.level} reached`:`+${xp} XP`;
  if(id.startsWith('road-')){if(!c.roadCleared.includes(id))c.roadCleared.push(id);if(c.roadCleared.length===3&&c.stage===1){c.stage=2;note+=' · An empty courier’s satchel lies beside the lantern. Continue to the glassworks, or report to Elder Elara.';}}
  if(id==='furnace'&&(c.stage===2||c.stage===3)){c.stage=4;note+=' · The furnace falls silent. Speak to Lys.';}
  if(id==='guardian'&&c.stage===5){c.stage=6;note+=' · Return to Greyhaven with the memory prism.';}
@@ -115,9 +117,8 @@ export function campaignAction(g:Game,action:string){const c=g.campaign;if(!c||g
      return true;
    }
    if(action==='part-ways'){
+     if(g.heroes[0].hp<=0)return false;
      c.stage=ESTUARY_STAGE.alone;
-     g.heroes[0].hp=g.heroes[0].maxHp;
-     g.heroes[0].mp=g.heroes[0].maxMp;
      return true;
    }
    if(action==='secure-tide'){
@@ -129,7 +130,6 @@ export function campaignAction(g:Game,action:string){const c=g.campaign;if(!c||g
  if(action==='report-courier'&&c.zone==='village'&&p.ledger&&!p.courierReported){
    p.courierReported=true;
    refreshStats(g);
-   g.heroes.forEach((hero,i)=>{if(activeHero(g,i))hero.mp=Math.min(hero.maxMp,hero.mp+4);});
    return true;
  }
  if(action==='return-lantern'&&c.zone==='estuary'&&p.lantern&&!p.lanternReturned){
@@ -145,7 +145,11 @@ export function campaignAction(g:Game,action:string){const c=g.campaign;if(!c||g
    g.heroes[1].mp=g.heroes[1].maxMp;
    return true;
  }
- if(action==='rest'&&c.zone==='village'&&g.gold>=5){g.gold-=5;g.heroes.forEach(h=>{h.hp=h.maxHp;h.mp=h.maxMp;});return true;}
+ if(action==='rest'&&(c.zone==='village'||c.zone==='estuary')&&g.gold>=REST_COST&&partyNeedsRest(g)){
+   g.gold-=REST_COST;
+   g.heroes.forEach((h,i)=>{if(activeHero(g,i)){h.hp=h.maxHp;h.mp=h.maxMp;}});
+   return true;
+ }
  if(action==='potion'&&c.potions>0){const hero=g.heroes.filter((_,i)=>activeHero(g,i)).sort((a,b)=>a.hp/a.maxHp-b.hp/b.maxHp)[0];if(hero.hp>=hero.maxHp)return false;c.potions--;hero.hp=Math.min(hero.maxHp,hero.hp+80);return true;}
  if(action==='buy-potion'&&c.zone==='village'&&g.gold>=12&&c.potions<9){g.gold-=12;c.potions++;return true;}
  if(action==='buy-weapon'&&c.zone==='village'&&g.gold>=45&&c.weapon==='iron'){g.gold-=45;c.weapon='tempered';refreshStats(g);return true;}

@@ -1,6 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createGame,beginBattle,tick,togglePause,useSkill,SKILLS,move,turn,interact,continueAfterBattle,retreat} from '../src/engine.ts';
+import {setupCampaign} from '../src/campaign.ts';
 import {MAP,ENCOUNTERS,CHEST,GATE,EXIT,SHRINE,wall,lineOfSight,START,DIRECTIONS} from '../src/world.ts';
 import {serialize,deserialize} from '../src/save.ts';
 const battle=(kind='wraith')=>{const g=createGame();beginBattle(g,{id:'test',kind,x:2,y:1});return g;};
@@ -27,7 +28,7 @@ test('Orders during pause reserve no mana and execute only after resuming, once'
  const g=battle();togglePause(g);const mp=g.heroes[1].mp,hp=g.battle.enemies[0].hp;
  assert(useSkill(g,'frost'));assert.equal(g.heroes[1].mp,mp);assert.equal(g.battle.enemies[0].hp,hp);assert.deepEqual(g.battle.queue,['frost']);
  advance(g,2);assert.equal(g.battle.enemies[0].hp,hp);togglePause(g);tick(g,1/60);assert.equal(g.heroes[1].mp<mp,true);assert.equal(g.battle.enemies[0].hp,hp-30);assert.equal(g.battle.queue.length,0);
- const after=g.heroes[1].mp;tick(g,1/60);assert(g.heroes[1].mp>=after);
+ const after=g.heroes[1].mp;tick(g,1/60);assert.equal(g.heroes[1].mp,after);
 });
 test('One planned action per hero; replacing and cancelling are deterministic',()=>{
  const g=battle();togglePause(g);useSkill(g,'frost');useSkill(g,'heal');assert.deepEqual(g.battle.queue,['heal']);useSkill(g,'fracture');assert.deepEqual(g.battle.queue,['heal','fracture']);useSkill(g,'heal');assert.deepEqual(g.battle.queue,['fracture']);
@@ -37,6 +38,25 @@ test('Separate hero commands respect the global cooldown after resuming',()=>{
 });
 test('Frost interrupts a telegraphed strike; no damage lands during the stun',()=>{
  const g=battle();advance(g,5);assert(g.battle.enemies[0].windup>0);const hp=g.heroes.map(h=>h.hp);useSkill(g,'frost');assert.equal(g.battle.enemies[0].windup,0);advance(g,1.5);assert.deepEqual(g.heroes.map(h=>h.hp),hp);
+});
+test('A full party fighting automatically still takes damage in an ordinary encounter',()=>{
+ const g=setupCampaign(createGame());
+ g.campaign.recruited=true;
+ assert(beginBattle(g,ENCOUNTERS.find(e=>e.id==='first')));
+ const before=g.heroes.map(h=>h.hp);
+ advance(g,15);
+ assert.equal(g.phase,'victory');
+ assert(g.heroes[0].hp<before[0]);
+ assert.deepEqual(g.heroes.map(h=>h.mp),[32,44]);
+});
+test('Fracture deals damage without resetting the enemy’s attack before a windup',()=>{
+ const g=battle('wraith');
+ advance(g,2);
+ const e=g.battle.enemies[0],clock=e.clock;
+ assert(useSkill(g,'fracture'));
+ assert.equal(e.clock,clock);
+ advance(g,1.2);
+ assert(e.windup>0);
 });
 test('Cooldowns and mana prevent unlimited casts',()=>{
  const g=battle('sentinel');assert(useSkill(g,'fracture'));assert.equal(useSkill(g,'fracture'),false);advance(g,6);g.heroes[0].mp=0;assert.equal(useSkill(g,'fracture'),false);

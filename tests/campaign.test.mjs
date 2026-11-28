@@ -14,6 +14,25 @@ test('A cleared road sector repopulates only after twenty seconds outside it',()
 test('Road movement and campaign migration survive coordinates outside the old crypt map',()=>{const g=fresh();campaignAction(g,'accept');travel(g,'road');g.position={x:19,y:6};assert.equal(roadMove(g,0).id,'road-lantern');assert(deserialize(serialize(g)));const bad=JSON.parse(serialize(g));bad.campaign.level=999;assert.equal(deserialize(JSON.stringify(bad)),null);const legacy=createGame();legacy.cleared.add('first');assert.equal(deserialize(serialize(legacy)).campaign,undefined);});
 test('Title, village and outdoor music follow the actual chapter scene',()=>{const g=fresh();assert.equal(musicScene(g,false),'title');assert.equal(musicScene(g,true),'village');campaignAction(g,'accept');travel(g,'road');assert.equal(musicScene(g,true),'road');});
 test('XP cannot remove existing equipment bonuses and subsequent levels grow predictably',()=>{const g=fresh();g.gold=100;campaignAction(g,'buy-weapon');const first=g.heroes[0].attack;grantXp(g,50);assert.equal(g.campaign.level,2);assert.equal(g.heroes[0].attack,first+3);assert.equal(g.campaign.xp,0);assert(deserialize(serialize(g)));});
+test('Victory and level-up preserve wounds, spent MP and knockouts through travel and saving',()=>{
+ const g=fresh();
+ Object.assign(g.campaign,{stage:5,recruited:true,zone:'glassworks'});
+ g.heroes[0].hp=91;
+ g.heroes[0].mp=12;
+ g.heroes[1].hp=0;
+ g.heroes[1].mp=7;
+ win(g,FURNACE);
+ assert.equal(g.campaign.level,2);
+ assert.equal(g.gold,40);
+ assert(travel(g,'village'));
+ const loaded=deserialize(serialize(g));
+ assert.deepEqual(loaded.heroes.map(h=>[h.hp,h.mp]),[[91,7],[0,7]]);
+ assert(campaignAction(loaded,'rest'));
+ assert.equal(loaded.gold,35);
+ assert.deepEqual(loaded.heroes.map(h=>[h.hp,h.mp]),loaded.heroes.map(h=>[h.maxHp,h.maxMp]));
+ assert(!campaignAction(loaded,'rest'));
+ assert.equal(loaded.gold,35);
+});
 test('The full first chapter can be completed through road, recruitment, crypt movement and final report',async()=>{
  const {move,turn,interact}=await import('../src/engine.ts');const {CHEST,GATE,DIRECTIONS,wall}=await import('../src/world.ts');const g=fresh();
  function fight(){for(let frame=0;frame<120*60&&g.phase==='combat';frame++){const e=g.battle.enemies[0];if(g.heroes.some((h,i)=>(i===0||g.campaign.recruited)&&h.hp>0&&h.hp<h.maxHp*.65))useSkill(g,'heal');if(e.windup>0)useSkill(g,'frost');if(g.battle.cooldowns.frost>1||!e.windup)useSkill(g,'fracture');tick(g,1/60);}assert.equal(g.phase,'victory');continueAfterBattle(g);}
@@ -78,10 +97,12 @@ test('Turning in the courier’s evidence changes the party mana ceiling exactly
  assert(campaignAction(g,'ledger'));
  assert(travel(g,'village'));
  const before=g.heroes.map(h=>h.maxMp);
+ const mana=g.heroes.map(h=>h.mp);
  assert(campaignAction(g,'report-courier'));
  assert(!campaignAction(g,'report-courier'));
  const after=before.map(max=>max+4);
  assert.deepEqual(g.heroes.map(h=>h.maxMp),after);
+ assert.deepEqual(g.heroes.map(h=>h.mp),mana);
  assert.deepEqual(deserialize(serialize(g)).heroes.map(h=>h.maxMp),after);
 });
 

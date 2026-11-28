@@ -12,9 +12,9 @@ export interface Battle {encounter:string;enemies:Enemy[];target:number;time:num
 export interface Feedback {id:number;kind:'hit'|'hurt'|'heal'|'ice'|'break'|'guard';text:string;enemy?:number;hero?:number;time:number}
 export interface Game {campaign?:Campaign;phase:Phase;position:Point;direction:number;heroes:Hero[];battle:Battle|null;cleared:Set<string>;roaming:Set<string>;respawnAt:Record<string,number>;seen:Set<string>;key:boolean;gateOpen:boolean;chestOpen:boolean;shrineUsed:boolean;gold:number;message:string;feedback:Feedback[];eventId:number;playTime:number}
 export const CREATURES:Record<CreatureKind,{name:string;hp:number;attack:number;period:number;windup:number;skill:string;tip:string;row:number}>={
-  scavenger:{name:'Glass Scavenger',hp:115,attack:12,period:3.6,windup:1.5,skill:'Crystal Bite',tip:'Fracture breaks its crystalline shell.',row:0},
-  wraith:{name:'Lantern Watcher',hp:150,attack:22,period:4.8,windup:2.4,skill:'Devouring Light',tip:'Interrupt its spell with Frost Shard.',row:1},
-  sentinel:{name:'The Faceless Warden',hp:580,attack:36,period:5.2,windup:2.8,skill:'Warden’s Judgment',tip:'Its heavy strikes threaten the entire party. Save Frost Shard to interrupt them.',row:2},
+  scavenger:{name:'Glass Scavenger',hp:115,attack:16,period:2.4,windup:1.6,skill:'Crystal Bite',tip:'Fracture breaks its crystalline shell.',row:0},
+  wraith:{name:'Lantern Watcher',hp:150,attack:26,period:3,windup:2.1,skill:'Devouring Light',tip:'Interrupt its spell with Frost Shard.',row:1},
+  sentinel:{name:'The Faceless Warden',hp:580,attack:36,period:4.1,windup:2.6,skill:'Warden’s Judgment',tip:'Its heavy strikes threaten the entire party. Save Frost Shard to interrupt them.',row:2},
 };
 export const SKILLS:Record<Skill,{name:string;cost:number;cooldown:number;hero:number;description:string}>={
   fracture:{name:'Fracture',cost:5,cooldown:5,hero:0,description:'Deals 38 damage and interrupts the target.'},
@@ -149,16 +149,18 @@ function execute(g:Game,skill:Skill){
     const counter=interrupted&&enemy.riposte;
     const broken=skill==='fracture'&&enemy.shell;
     if(broken)enemy.shell=false;
-    enemy.windup=0;
-    enemy.clock=0;
-    enemy.riposte=false;
+    if(interrupted){
+      enemy.windup=0;
+      enemy.clock=0;
+      enemy.riposte=false;
+    }
     if(skill==='frost'){
       enemy.frozen=!counter;
       if(!counter)enemy.stunned=2;
       damage(g,enemy,skillPower(g,'frost'),'ice');
     }else{
       enemy.frozen=false;
-      if(!counter)enemy.stunned=Math.max(enemy.stunned,.6);
+      if(interrupted&&!counter)enemy.stunned=Math.max(enemy.stunned,.6);
       damage(g,enemy,Math.round(skillPower(g,'fracture')*(b.exposed?1.5:1)),'break');
       b.exposed=false;
     }
@@ -188,13 +190,12 @@ function resolve(g:Game){
     const returning=g.roaming.delete(b.encounter);
     if(PATROL_SITES.some(id=>id===b.encounter))g.respawnAt[b.encounter]=g.playTime+RESPAWN_DELAY;
     g.cleared.add(b.encounter);g.phase='victory';b.paused=false;b.queue=[];
-    const warden=b.encounter==='guardian',keeper=b.encounter==='bell-keeper';g.gold+=warden||keeper?100:returning?10:20;
-    g.heroes.forEach((h,i)=>{if(activeHero(g,i)){
-      h.hp=Math.min(h.maxHp,Math.max(h.hp,1)+(returning?6:18));
-      h.mp=Math.min(h.maxMp,h.mp+(returning?4:10));
-    }});
+    const warden=b.encounter==='guardian',keeper=b.encounter==='bell-keeper';
+    const shards=warden||keeper?100:returning?10:20;
+    g.gold+=shards;
     const advancement=campaignVictory(g,b.encounter,returning);
-    g.message=(keeper?'The Drowned Keeper falls. The bell goes still.':warden?(g.campaign?'The memory prism is yours. Greyhaven is waiting.':'The Warden has fallen. The exit lies ahead.'):returning?'Patrol defeated · +10 shards, +6 HP and +4 MP each':'Passage cleared · +18 HP and +10 MP each')+(advancement?' · '+advancement:'');
+    const result=keeper?'The Drowned Keeper falls. The bell goes still.':warden?(g.campaign?'The memory prism is yours. Greyhaven is waiting.':'The Warden has fallen. The exit lies ahead.'):returning?'Patrol defeated':'Passage cleared';
+    g.message=`${result} · +${shards} shards`+(advancement?' · '+advancement:'');
   }else if(g.heroes.every((h,i)=>!activeHero(g,i)||h.hp<=0)){g.phase='defeat';b.paused=false;b.queue=[];g.message='Your expedition ends here. Return to the last saved checkpoint.';}
   else b.target=visibleEnemy(b).id;
 }
@@ -211,7 +212,7 @@ export function tick(g:Game,dt:number){
     for(const skill of Object.keys(SKILLS)as Skill[])b.cooldowns[skill]=Math.max(0,b.cooldowns[skill]-step);
     if(b.queue.length&&b.globalCooldown<=0){const skill=b.queue.shift()!;execute(g,skill);if(g.phase!=='combat')break;}
     for(const h of g.heroes){
-      if(h.hp<=0||!activeHero(g,g.heroes.indexOf(h)))continue;h.mp=Math.min(h.maxMp,h.mp+step*.25);h.clock+=step;
+      if(h.hp<=0||!activeHero(g,g.heroes.indexOf(h)))continue;h.clock+=step;
       if(h.clock>=2.2){h.clock-=2.2;const e=livingTarget(g);if(e)damage(g,e,h.attack);resolve(g);if(g.phase!=='combat')break;}
     }
     if(g.phase!=='combat')break;

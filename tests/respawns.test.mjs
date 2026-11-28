@@ -15,7 +15,7 @@ test('Patrols wait twenty seconds, stay out of sight and away from the player, a
 });
 test('A returning patrol rewards once, preserves objectives, and starts a new cooldown',()=>{
  const g=cleared();g.playTime=20;updateRespawns(g);beginBattle(g,ENCOUNTERS[0]);g.battle.enemies[0].hp=1;g.heroes[0].hp=100;g.heroes[0].mp=20;useSkill(g,'fracture');
- assert.equal(g.phase,'victory');assert.equal(g.gold,10);assert.equal(g.heroes[0].hp,106);assert.equal(g.heroes[0].mp,19);assert.equal(g.roaming.size,0);assert.equal(g.cleared.size,1);assert.equal(g.respawnAt.first,40);
+ assert.equal(g.phase,'victory');assert.equal(g.gold,10);assert.equal(g.heroes[0].hp,100);assert.equal(g.heroes[0].mp,15);assert.equal(g.roaming.size,0);assert.equal(g.cleared.size,1);assert.equal(g.respawnAt.first,40);
  continueAfterBattle(g);updateRespawns(g);assert.equal(g.roaming.size,0);
 });
 test('Save restores returning patrols and migrates old saves without an immediate respawn',()=>{
